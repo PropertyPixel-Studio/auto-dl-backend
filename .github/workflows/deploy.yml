@@ -16,7 +16,7 @@ jobs:
       - name: Set up SSH for server access
         uses: webfactory/ssh-agent@v0.5.3
         with:
-          ssh-private-key: ${{ secrets.SERVER_DEPLOYMENTUSER_SSH }}  # Uses the organization-level secret
+          ssh-private-key: ${{ secrets.SERVER_DEPLOYMENTUSER_SSH }}
 
       - name: Copy files to the server
         run: |
