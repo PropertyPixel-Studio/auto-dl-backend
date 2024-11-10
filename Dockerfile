@@ -1,23 +1,26 @@
-# Use a base image with Java and Maven
-FROM maven:3.8.6-openjdk-17 AS build
+# Stage 1: Build the application
+FROM maven:3.9.4-eclipse-temurin-21 AS build
 
-# Set the working directory in the container
+# Set the working directory
 WORKDIR /app
 
-# Copy the source code to the container
+# Copy the project files to the container
 COPY . .
 
-# Build the application
+# Build the project, packaging it as a JAR
 RUN mvn clean package -DskipTests
 
-# Use a lighter image for running the application
-FROM openjdk:17-jdk-slim
+# Stage 2: Run the application
+FROM eclipse-temurin:21-jre-jammy
 
-# Copy the built .jar file from the build stage
+# Copy the built JAR file from the build stage
 COPY --from=build /app/target/*.jar /app/app.jar
 
-# Expose the application port
+# Set the server port as an environment variable
+ENV SERVER_PORT=3333
+
+# Expose the specified port
 EXPOSE 3333
 
-# Run the application
-CMD ["java", "-jar", "/app/app.jar"]
+# Run the application on the specified port
+CMD ["java", "-jar", "/app/app.jar", "--server.port=${SERVER_PORT}"]
