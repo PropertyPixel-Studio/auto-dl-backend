@@ -4,3 +4,5 @@ services:
     ports:
       - "3333:3333"
     restart: always
+    environment:
+      - SERVER_PORT=3333
