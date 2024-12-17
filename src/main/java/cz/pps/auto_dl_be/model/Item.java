@@ -12,7 +12,6 @@ import lombok.Setter;
 
 @Entity
 @Table(name = "item", schema = "public")
-@JsonIdentityInfo(generator = ObjectIdGenerators.UUIDGenerator.class)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -53,7 +52,4 @@ public class Item extends AbstractEntity {
 
     @Column(name="tecDocSupplierName", nullable = true)
     private String tecDocSupplierName;
-
-    @Column(name="name", nullable = true)
-    private String name;
 }

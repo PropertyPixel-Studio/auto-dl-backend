@@ -1,10 +1,12 @@
 package cz.pps.auto_dl_be.service;
 
-import cz.pps.auto_dl_be.config.CsvConfig;
 import cz.pps.auto_dl_be.dao.ItemDao;
 import cz.pps.auto_dl_be.model.Item;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -16,24 +18,23 @@ import java.io.*;
 public class CsvService {
 
     private final ItemDao itemDao;
-//    private final CsvConfig csvConfig;
+    private static final Logger logger = LoggerFactory.getLogger(CsvService.class);
 
     private static Item getItem(String line) {
-        String[] values = line.split(",");
+        String[] values = line.split(";");
         Item item = new Item();
-        item.setProductCode(values[0]);
-        item.setManufacturer(values[1]);
-        item.setProductName(values[2]);
-        item.setMainStock(values[3]);
-        item.setOtherBranchStock(values[4]);
-        item.setSupplierStock(values[5]);
-        item.setPrice(values[6]);
-        item.setVatRate(values[7]);
-        item.setCurrency(values[8]);
-        item.setDeposit(values[9]);
-        item.setTecDocld(values[10]);
-        item.setTecDocSupplierName(values[11]);
-        item.setName(values[12]);
+        item.setProductCode(values.length == 0 ? null : values[0]);
+        item.setManufacturer(values.length <= 1 ? null : values[1]);
+        item.setProductName(values.length <= 2 ? null : values[2]);
+        item.setMainStock(values.length <= 3 ? null : values[3]);
+        item.setOtherBranchStock(values.length <= 4 ? null : values[4]);
+        item.setSupplierStock(values.length <= 5 ? null : values[5]);
+        item.setPrice(values.length <= 6 ? null : values[6]);
+        item.setVatRate(values.length <= 7 ? null : values[7]);
+        item.setCurrency(values.length <= 8 ? null : values[8]);
+        item.setDeposit(values.length <= 9 ? null : values[9]);
+        item.setTecDocld(values.length <= 10 ? null : values[10]);
+        item.setTecDocSupplierName(values.length <= 11 ? null : values[11]);
         return item;
     }
 
@@ -75,6 +76,7 @@ public class CsvService {
     public void init() {
         try {
             downloadAndSaveCsvAsItems("xxx");
+            logger.info("Application has finished loading and is ready.");
         } catch (IOException e) {
             e.printStackTrace();
         }
