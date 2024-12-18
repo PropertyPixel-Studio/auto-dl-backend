@@ -1,6 +1,10 @@
 package cz.pps.auto_dl_be.service;
 
 import cz.pps.auto_dl_be.dao.ItemDao;
+import cz.pps.auto_dl_be.exception.CsvConversionException;
+import cz.pps.auto_dl_be.exception.CsvDownloadException;
+import cz.pps.auto_dl_be.exception.NoDataException;
+import cz.pps.auto_dl_be.exception.SavingCsvException;
 import cz.pps.auto_dl_be.model.Item;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -17,8 +21,10 @@ import java.io.*;
 @RequiredArgsConstructor
 public class CsvService {
 
-    private final ItemDao itemDao;
     private static final Logger logger = LoggerFactory.getLogger(CsvService.class);
+    private final ItemDao itemDao;
+    @Value("${api.url}")
+    private String apiUrl;
 
     private static Item getItem(String line) {
         String[] values = line.split(";");
@@ -38,33 +44,35 @@ public class CsvService {
         return item;
     }
 
-    public void downloadAndSaveCsvAsItems(String apiUrl) throws IOException {
-        // Step 1: Download the CSV file from the API
+    private static File getCsvFile(String apiUrl) throws CsvDownloadException, NoDataException, SavingCsvException {
         RestTemplate restTemplate = new RestTemplate();
         String csvData;
+        logger.info("Downloading CSV data from API...");
         try {
             csvData = restTemplate.getForObject(apiUrl, String.class);
         } catch (RestClientException e) {
-            throw new IOException("Failed to download CSV data from API", e);
+            throw new CsvDownloadException("Failed to download CSV data from API", e);
         }
 
         if (csvData == null) {
-            throw new IOException("CSV data is null");
+            throw new NoDataException("CSV data is null");
         }
 
         File csvFile = new File("data.csv");
         try (FileWriter writer = new FileWriter(csvFile)) {
             writer.write(csvData);
+        } catch (IOException e) {
+            throw new SavingCsvException("Failed to write CSV data to file", e);
         }
+        return csvFile;
+    }
+
+    public void downloadAndSaveCsvAsItems() throws CsvDownloadException, NoDataException, SavingCsvException, CsvConversionException {
+        // Step 1: Download the CSV file from the API
+        File csvFile = getCsvFile(this.apiUrl);
 
         // Step 2: Read the CSV file and save data as Item entities
-        try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                Item item = getItem(line);
-                itemDao.save(item);
-            }
-        }
+        convertToItems(csvFile);
 
         // Step 3: Delete the CSV file
         if (csvFile.exists()) {
@@ -72,12 +80,29 @@ public class CsvService {
         }
     }
 
+    private void convertToItems(File csvFile) throws CsvConversionException {
+        try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
+            String line;
+            boolean isFirstLine = true;
+            while ((line = br.readLine()) != null) {
+                if (isFirstLine) {
+                    isFirstLine = false;
+                    continue; // Skip the first line
+                }
+                Item item = getItem(line);
+                itemDao.save(item);
+            }
+        } catch (IOException e) {
+            throw new CsvConversionException("Failed to convert CSV data to items", e);
+        }
+    }
+
     @PostConstruct
     public void init() {
         try {
-            downloadAndSaveCsvAsItems("xxx");
+            downloadAndSaveCsvAsItems();
             logger.info("Application has finished loading and is ready.");
-        } catch (IOException e) {
+        } catch (CsvDownloadException | NoDataException | SavingCsvException | CsvConversionException e) {
             e.printStackTrace();
         }
     }
