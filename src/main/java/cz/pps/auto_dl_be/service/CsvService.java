@@ -23,7 +23,7 @@ public class CsvService {
 
     private static final Logger logger = LoggerFactory.getLogger(CsvService.class);
     private final ItemDao itemDao;
-    @Value("${api.url}")
+    @Value("${darma.url}")
     private String apiUrl;
 
     private static Item getItem(String line) {

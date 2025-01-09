@@ -2,7 +2,7 @@ services:
   app:
     build: .
     ports:
-      - "3333:3333"
+      - "50021:50021"
     restart: always
     environment:
-      - SERVER_PORT=3333
+      - SERVER_PORT=50021

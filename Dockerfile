@@ -17,10 +17,10 @@ FROM eclipse-temurin:21-jre-jammy
 COPY --from=build /app/target/*.jar /app/app.jar
 
 # Set the server port as an environment variable
-ENV SERVER_PORT=3333
+ENV SERVER_PORT=50021
 
 # Expose the specified port
-EXPOSE 3333
+EXPOSE 50021
 
 # Run the application on the specified port
 CMD ["java", "-jar", "/app/app.jar", "--server.port=${SERVER_PORT}"]
