@@ -12,8 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.*;
 
@@ -26,7 +25,7 @@ public class CsvService {
     @Value("${darma.url}")
     private String apiUrl;
 
-    private static Item getItem(String line) {
+    private Item getItem(String line) {
         String[] values = line.split(";");
         Item item = new Item();
         item.setProductCode(values.length == 0 ? null : values[0]);
@@ -45,16 +44,24 @@ public class CsvService {
     }
 
     private static File getCsvFile(String apiUrl) throws CsvDownloadException, NoDataException, SavingCsvException {
-        RestTemplate restTemplate = new RestTemplate();
+        WebClient webClient = WebClient.builder()
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(50 * 1024 * 1024)) // 10 MB buffer size
+                .build();
         String csvData;
         logger.info("Downloading CSV data from API...");
         try {
-            csvData = restTemplate.getForObject(apiUrl, String.class);
-        } catch (RestClientException e) {
+            csvData = webClient.get()
+                    .uri(apiUrl)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+        } catch (Exception e) {
+            logger.error("Error occurred while downloading CSV data: {}", e.getMessage(), e);
             throw new CsvDownloadException("Failed to download CSV data from API", e);
         }
 
         if (csvData == null) {
+            logger.warn("No data received from API");
             throw new NoDataException("CSV data is null");
         }
 
@@ -62,6 +69,7 @@ public class CsvService {
         try (FileWriter writer = new FileWriter(csvFile)) {
             writer.write(csvData);
         } catch (IOException e) {
+            logger.error("Error occurred while saving CSV data to file: {}", e.getMessage(), e);
             throw new SavingCsvException("Failed to write CSV data to file", e);
         }
         return csvFile;
@@ -82,16 +90,10 @@ public class CsvService {
 
     private void convertToItems(File csvFile) throws CsvConversionException {
         try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
-            String line;
-            boolean isFirstLine = true;
-            while ((line = br.readLine()) != null) {
-                if (isFirstLine) {
-                    isFirstLine = false;
-                    continue; // Skip the first line
-                }
-                Item item = getItem(line);
-                itemDao.save(item);
-            }
+            br.lines()
+                    .skip(1) // Skip the first line
+                    .map(this::getItem)
+                    .forEach(itemDao::save);
         } catch (IOException e) {
             throw new CsvConversionException("Failed to convert CSV data to items", e);
         }
