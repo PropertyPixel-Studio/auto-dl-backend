@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.*;
+import java.util.Arrays;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +25,7 @@ public class CsvService {
     private final ItemDao itemDao;
     @Value("${darma.url}")
     private String apiUrl;
+    private final String[] testBrand = {"Herth+Buss Elparts", "METZGER", "FEBI BILSTEIN", "JP GROUP", "vika", "FAST", "OREX", "TOTAL"};
 
     private Item getItem(String line) {
         String[] values = line.split(";");
@@ -45,7 +47,7 @@ public class CsvService {
 
     private static File getCsvFile(String apiUrl) throws CsvDownloadException, NoDataException, SavingCsvException {
         WebClient webClient = WebClient.builder()
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(50 * 1024 * 1024)) // 10 MB buffer size
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(100 * 1024 * 1024)) // 10 MB buffer size
                 .build();
         String csvData;
         logger.info("Downloading CSV data from API...");
@@ -93,6 +95,10 @@ public class CsvService {
             br.lines()
                     .skip(1) // Skip the first line
                     .map(this::getItem)
+                    .filter(item -> item.getManufacturer() != null &&
+                            Arrays.stream(testBrand).anyMatch(item.getManufacturer()::contains) &&
+                            item.getTecDocSupplierName() != null &&
+                            item.getTecDocld() != null)
                     .forEach(itemDao::save);
         } catch (IOException e) {
             throw new CsvConversionException("Failed to convert CSV data to items", e);
