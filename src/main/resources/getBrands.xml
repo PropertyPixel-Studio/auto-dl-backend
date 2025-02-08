@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:tec="http://www.tecalliance.services/pegasus-3-0">
+    <soapenv:Header/>
+    <soapenv:Body>
+        <tec:getBrands>
+            <tec:articleCountry>CZ</tec:articleCountry>
+
+            <tec:lang>CS</tec:lang>
+
+            <tec:provider>24019</tec:provider>
+        </tec:getBrands>
+    </soapenv:Body>
+</soapenv:Envelope>

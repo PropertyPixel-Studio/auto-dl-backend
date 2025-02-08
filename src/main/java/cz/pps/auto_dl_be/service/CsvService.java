@@ -1,6 +1,9 @@
 package cz.pps.auto_dl_be.service;
 
 import cz.pps.auto_dl_be.dao.ItemDao;
+import cz.pps.auto_dl_be.dto.brands.Brand;
+import cz.pps.auto_dl_be.dto.detail.Article;
+import cz.pps.auto_dl_be.dto.detail.Detail;
 import cz.pps.auto_dl_be.exception.CsvConversionException;
 import cz.pps.auto_dl_be.exception.CsvDownloadException;
 import cz.pps.auto_dl_be.exception.NoDataException;
@@ -11,11 +14,17 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +32,7 @@ public class CsvService {
 
     private static final Logger logger = LoggerFactory.getLogger(CsvService.class);
     private final ItemDao itemDao;
+    private final TecDocService tecDocService;
     @Value("${darma.url}")
     private String apiUrl;
     private final String[] testBrand = {"Herth+Buss Elparts", "METZGER", "FEBI BILSTEIN", "JP GROUP", "vika", "FAST", "OREX", "TOTAL"};
@@ -81,16 +91,26 @@ public class CsvService {
         // Step 1: Download the CSV file from the API
         File csvFile = getCsvFile(this.apiUrl);
 
-        // Step 2: Read the CSV file and save data as Item entities
-        convertToItems(csvFile);
+        // Step 2: Get brands from TecDoc API
+        List<Brand> brands = tecDocService.fetchBrands().block();
+        if (brands == null || brands.isEmpty()) {
+            throw new NoDataException("No brands received from TecDoc API");
+        }
 
-        // Step 3: Delete the CSV file
+        // Step 3: Read the CSV file and save data as Item entities
+        convertToItems(csvFile, brands);
+
+        // Step 4: Delete the CSV file
         if (csvFile.exists()) {
             csvFile.delete();
         }
     }
 
-    private void convertToItems(File csvFile) throws CsvConversionException {
+    private void convertToItems(File csvFile, List<Brand> brands) throws CsvConversionException {
+        // Create a map of TecDocSupplierName to dataSupplierId
+        Map<String, Integer> brandMap = brands.stream()
+                .collect(Collectors.toMap(Brand::getMfrName, Brand::getDataSupplierId));
+
         try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
             br.lines()
                     .skip(1) // Skip the first line
@@ -99,6 +119,13 @@ public class CsvService {
                             Arrays.stream(testBrand).anyMatch(item.getManufacturer()::contains) &&
                             item.getTecDocSupplierName() != null &&
                             item.getTecDocld() != null)
+                    .peek(item -> {
+                        // Pair TecDocSupplierName to dataSupplierId
+                        Integer dataSupplierId = brandMap.get(item.getTecDocSupplierName());
+                        if (dataSupplierId != null) {
+                            item.setTecDocSupplierID(String.valueOf(dataSupplierId));
+                        }
+                    })
                     .forEach(itemDao::save);
         } catch (IOException e) {
             throw new CsvConversionException("Failed to convert CSV data to items", e);
@@ -107,11 +134,13 @@ public class CsvService {
 
     @PostConstruct
     public void init() {
-        try {
-            downloadAndSaveCsvAsItems();
-            logger.info("Application has finished loading and is ready.");
-        } catch (CsvDownloadException | NoDataException | SavingCsvException | CsvConversionException e) {
-            e.printStackTrace();
-        }
+//        try {
+//            downloadAndSaveCsvAsItems();
+//            logger.info("Application has finished loading and is ready.");
+//        } catch (CsvDownloadException | NoDataException | SavingCsvException | CsvConversionException e) {
+//            logger.error("Error occurred during application initialization: {}", e.getMessage(), e);
+//        }
+        List<Article> articles = tecDocService.fetchDetail("2140449", "94").block();
+        System.out.println(articles);
     }
 }
