@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -21,5 +22,9 @@ public class ItemService {
 
     public Page<Item> getItems(Pageable pageable) {
         return itemDao.findAll(pageable);
+    }
+
+    public Optional<Item> getItemByTecDocId(String tecDocId) {
+        return itemDao.findByTecDocld(tecDocId);
     }
 }
