@@ -50,7 +50,4 @@ public class Item extends AbstractEntity {
 
     @Column(name = "tecDocSupplierID", nullable = true)
     private String tecDocSupplierID = null;
-
-    @Column(name = "articleDetailFull", nullable = true, length = 100000)
-    private String articleDetailFull = null;
 }

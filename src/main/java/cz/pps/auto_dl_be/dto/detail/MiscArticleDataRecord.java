@@ -6,38 +6,44 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class Misc {
-
+public class MiscArticleDataRecord {
     @JacksonXmlProperty(localName = "additionalDescriptionId")
-    private int additionalDescriptionId;
+    private Integer additionalDescriptionId;
 
     @JacksonXmlProperty(localName = "additionalDescription")
     private String additionalDescription;
 
     @JacksonXmlProperty(localName = "articleStatusId")
-    private int articleStatusId;
+    private Integer articleStatusId;
 
     @JacksonXmlProperty(localName = "articleStatusDescription")
     private String articleStatusDescription;
 
     @JacksonXmlProperty(localName = "articleStatusValidFromDate")
-    private String articleStatusValidFromDate;
+    private Integer articleStatusValidFromDate;
 
     @JacksonXmlProperty(localName = "quantityPerPackage")
-    private int quantityPerPackage;
+    private Integer quantityPerPackage;
 
     @JacksonXmlProperty(localName = "quantityPerPartPerPackage")
-    private int quantityPerPartPerPackage;
+    private Integer quantityPerPartPerPackage;
 
     @JacksonXmlProperty(localName = "isSelfServicePacking")
-    private boolean isSelfServicePacking;
+    private Boolean isSelfServicePacking;
 
     @JacksonXmlProperty(localName = "hasMandatoryMaterialCertification")
-    private boolean hasMandatoryMaterialCertification;
+    private Boolean hasMandatoryMaterialCertification;
 
     @JacksonXmlProperty(localName = "isRemanufacturedPart")
-    private boolean isRemanufacturedPart;
+    private Boolean isRemanufacturedPart;
 
     @JacksonXmlProperty(localName = "isAccessory")
-    private boolean isAccessory;
+    private Boolean isAccessory;
+
+    @JacksonXmlProperty(localName = "batchSize1")
+    private Integer batchSize1;
+
+    @JacksonXmlProperty(localName = "batchSize2")
+    private Integer batchSize2;
+
 }

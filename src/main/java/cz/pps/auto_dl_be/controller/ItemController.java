@@ -33,7 +33,7 @@ public class ItemController {
     public ResponseEntity<List<Article>> getDetail(@RequestParam String tecDocId) {
         Optional<Item> item = itemService.getItemByTecDocId(tecDocId);
         if (item.isPresent()) {
-            List<Article> articles = tecDocService.fetchDetail(
+            List<Article> articles = tecDocService.fetchArticles(
                     item.get().getTecDocld(),
                     item.get().getTecDocSupplierID())
                     .block();

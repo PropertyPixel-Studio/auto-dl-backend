@@ -6,20 +6,17 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class SearchQueryMatch {
-    @JacksonXmlProperty(localName = "matchType")
-    private String matchType;
-
-    @JacksonXmlProperty(localName = "description")
-    private String description;
-
-    @JacksonXmlProperty(localName = "match")
-    private String match;
+public class DataSupplierFacetCount {
+    @JacksonXmlProperty(localName = "dataSupplierId")
+    private Integer dataSupplierId;
 
     @JacksonXmlProperty(localName = "mfrId")
-    private Long mfrId;
+    private Integer mfrId;
 
     @JacksonXmlProperty(localName = "mfrName")
     private String mfrName;
+
+    @JacksonXmlProperty(localName = "count")
+    private Long count;
 
 }

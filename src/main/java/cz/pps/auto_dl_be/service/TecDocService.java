@@ -89,7 +89,7 @@ public class TecDocService {
         return template;
     }
 
-    public Mono<List<Article>> fetchDetail(String searchQuery, String dataSupplierIds) {
+    public Mono<List<Article>> fetchArticles(String searchQuery, String dataSupplierIds) {
         String xmlContent = getDetailXmlTemplate(searchQuery, dataSupplierIds);
         return webClient.post()
                 .uri(tecDocUrl)

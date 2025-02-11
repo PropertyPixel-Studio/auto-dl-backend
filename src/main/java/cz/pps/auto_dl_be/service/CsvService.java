@@ -130,16 +130,6 @@ public class CsvService {
         }
     }
 
-    private void addArticleDetail(Stream<Item> itemStream) {
-        itemStream.forEach(item -> {
-            List<Article> articles = tecDocService.fetchDetail(item.getTecDocld(), item.getTecDocSupplierID()).block();
-            if (articles != null && !articles.isEmpty()) {
-                item.setArticleDetailFull(articles.toString());
-                itemDao.save(item);
-            }
-        });
-    }
-
     @PostConstruct
     public void init() {
         try {
@@ -148,5 +138,7 @@ public class CsvService {
         } catch (CsvDownloadException | NoDataException | SavingCsvException | CsvConversionException e) {
             logger.error("Error occurred during application initialization: {}", e.getMessage(), e);
         }
+//        List<Article> articles = tecDocService.fetchArticles("2140449", "94").block();
+//        System.out.println(articles);
     }
 }

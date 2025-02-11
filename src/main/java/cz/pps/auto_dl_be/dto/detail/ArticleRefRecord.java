@@ -6,17 +6,26 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class OemNumber {
-
+public class ArticleRefRecord {
     @JacksonXmlProperty(localName = "articleNumber")
     private String articleNumber;
 
+    @JacksonXmlProperty(localName = "dataSupplierId")
+    private Integer dataSupplierId;
+
     @JacksonXmlProperty(localName = "mfrId")
-    private int mfrId;
+    private Integer mfrId;
 
     @JacksonXmlProperty(localName = "mfrName")
     private String mfrName;
 
     @JacksonXmlProperty(localName = "matchesSearchQuery")
-    private boolean matchesSearchQuery;
+    private Boolean matchesSearchQuery;
+
+    @JacksonXmlProperty(localName = "referenceTypeKey")
+    private String referenceTypeKey;
+
+    @JacksonXmlProperty(localName = "referenceTypeDescription")
+    private String referenceTypeDescription;
+
 }

@@ -6,16 +6,18 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class ArticleCriteria {
-
+public class CriteriaRecord {
     @JacksonXmlProperty(localName = "criteriaId")
-    private int criteriaId;
+    private Integer criteriaId;
 
     @JacksonXmlProperty(localName = "criteriaDescription")
     private String criteriaDescription;
 
     @JacksonXmlProperty(localName = "criteriaAbbrDescription")
     private String criteriaAbbrDescription;
+
+    @JacksonXmlProperty(localName = "criteriaUnitDescription")
+    private String criteriaUnitDescription;
 
     @JacksonXmlProperty(localName = "criteriaType")
     private String criteriaType;
@@ -24,7 +26,10 @@ public class ArticleCriteria {
     private String keyTableType;
 
     @JacksonXmlProperty(localName = "keyTableNum")
-    private int keyTableNum;
+    private Integer keyTableNum;
+
+    @JacksonXmlProperty(localName = "successorCriteriaId")
+    private Integer successorCriteriaId;
 
     @JacksonXmlProperty(localName = "rawValue")
     private String rawValue;
@@ -33,11 +38,15 @@ public class ArticleCriteria {
     private String formattedValue;
 
     @JacksonXmlProperty(localName = "immediateDisplay")
-    private boolean immediateDisplay;
+    private Boolean immediateDisplay;
 
     @JacksonXmlProperty(localName = "isMandatory")
-    private boolean isMandatory;
+    private Boolean isMandatory;
 
     @JacksonXmlProperty(localName = "isInterval")
-    private boolean isInterval;
+    private Boolean isInterval;
+
+    @JacksonXmlProperty(localName = "matchesSearchQuery")
+    private Boolean matchesSearchQuery;
+
 }

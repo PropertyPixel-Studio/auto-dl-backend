@@ -6,20 +6,32 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class Link {
-
-    @JacksonXmlProperty(localName = "url")
-    private String url;
+public class LinkRecord {
+    @JacksonXmlProperty(localName = "fileName")
+    private String fileName;
 
     @JacksonXmlProperty(localName = "typeDescription")
     private String typeDescription;
 
+    @JacksonXmlProperty(localName = "typeKey")
+    private Integer typeKey;
+
     @JacksonXmlProperty(localName = "headerDescription")
     private String headerDescription;
 
+    @JacksonXmlProperty(localName = "headerKey")
+    private Integer headerKey;
+
     @JacksonXmlProperty(localName = "sortNumber")
-    private int sortNumber;
+    private Integer sortNumber;
 
     @JacksonXmlProperty(localName = "assetSource")
     private String assetSource;
+
+    @JacksonXmlProperty(localName = "url")
+    private String url;
+
+    @JacksonXmlProperty(localName = "description")
+    private String description;
+
 }
