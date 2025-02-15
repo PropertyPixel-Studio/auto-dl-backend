@@ -12,7 +12,7 @@
             <tec:page>1</tec:page>
             <tec:searchQuery>${searchQuery}</tec:searchQuery>
             <tec:dataSupplierIds>${dataSupplierIds}</tec:dataSupplierIds>
-            <tec:searchType>10</tec:searchType>
+            <tec:searchType>0</tec:searchType>
         </tec:getArticles>
     </soapenv:Body>
 </soapenv:Envelope>

@@ -2,7 +2,6 @@ package cz.pps.auto_dl_be.service;
 
 import cz.pps.auto_dl_be.dao.ItemDao;
 import cz.pps.auto_dl_be.dto.brands.Brand;
-import cz.pps.auto_dl_be.dto.detail.Article;
 import cz.pps.auto_dl_be.exception.CsvConversionException;
 import cz.pps.auto_dl_be.exception.CsvDownloadException;
 import cz.pps.auto_dl_be.exception.NoDataException;
@@ -21,7 +20,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -109,7 +107,7 @@ public class CsvService {
                 .collect(Collectors.toMap(Brand::getMfrName, Brand::getDataSupplierId));
 
         try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
-            br.lines() // Stream<Item> itemStream =
+            br.lines()
                     .skip(1) // Skip the first line
                     .map(this::getItem)
                     .filter(item -> item.getManufacturer() != null &&
@@ -124,7 +122,6 @@ public class CsvService {
                         }
                     })
                     .forEach(itemDao::save);
-//            addArticleDetail(itemStream);
         } catch (IOException e) {
             throw new CsvConversionException("Failed to convert CSV data to items", e);
         }
