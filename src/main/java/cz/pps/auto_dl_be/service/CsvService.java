@@ -1,6 +1,5 @@
 package cz.pps.auto_dl_be.service;
 
-import cz.pps.auto_dl_be.dao.*;
 import cz.pps.auto_dl_be.dto.brands.Brand;
 import cz.pps.auto_dl_be.dto.detail.Article;
 import cz.pps.auto_dl_be.exception.CsvConversionException;
@@ -29,16 +28,15 @@ import java.util.stream.Collectors;
 public class CsvService {
 
     private static final Logger logger = LoggerFactory.getLogger(CsvService.class);
-//    private final ItemDao itemDao;
-    private final InventoryItemDao inventoryItemDao;
-    private final InventoryLevelDao inventoryLevelDao;
-    private final PriceDao priceDao;
-    private final PriceSetDao priceSetDao;
-    private final ProductDao productDao;
-    private final ProductSalesChannelDao productSalesChannelDao;
-    private final ProductVariantDao productVariantDao;
-    private final ProductVariantInventoryItemDao productVariantInventoryItemDao;
     private final TecDocService tecDocService;
+    private final InventoryItemService inventoryItemService;
+    private final InventoryLevelService inventoryLevelService;
+    private final PriceService priceService;
+    private final PriceSetService priceSetService;
+    private final ProductSalesChannelService productSalesChannelService;
+    private final ProductService productService;
+    private final ProductVariantInventoryItemService productVariantInventoryItemService;
+    private final ProductVariantService productVariantService;
     @Value("${darma.url}")
     private String apiUrl;
     private final String[] testBrand = {"Herth+Buss Elparts", "METZGER", "FEBI BILSTEIN", "JP GROUP", "vika", "FAST", "OREX", "TOTAL"};
@@ -134,7 +132,6 @@ public class CsvService {
                     })
                     .limit(1)
                     .forEach(item -> {
-//                        itemDao.save(item);
                         // Fetch articles from TecDocService
                         List<Article> articles = tecDocService.fetchArticles(item.getTecDocld(), item.getTecDocSupplierID()).block();
                         try {
@@ -147,23 +144,25 @@ public class CsvService {
                                 InventoryLevel inventoryLevel = new InventoryLevel(firstArticle, item.getMainStock());
                                 Price price = new Price(firstArticle, item.getPrice());
                                 PriceSet priceSet = new PriceSet(firstArticle);
-                                Product product = new Product(firstArticle, item.getTecDocSupplierID());
                                 ProductSalesChannel productSalesChannel = new ProductSalesChannel(firstArticle);
-                                ProductVariant productVariant = new ProductVariant(firstArticle);
+                                Product product = new Product(firstArticle, item.getTecDocSupplierID());
                                 ProductVariantInventoryItem productVariantInventoryItem = new ProductVariantInventoryItem(firstArticle);
-                                // Save the Product object using ProductDao
-                                inventoryItemDao.save(inventoryItem);
-                                inventoryLevelDao.save(inventoryLevel);
-                                priceDao.save(price);
-                                priceSetDao.save(priceSet);
-                                productDao.save(product);
-                                productSalesChannelDao.save(productSalesChannel);
-                                productVariantDao.save(productVariant);
-                                productVariantInventoryItemDao.save(productVariantInventoryItem);
+                                ProductVariant productVariant = new ProductVariant(firstArticle);
+
+                                // Save objects to the database
+                                inventoryItemService.saveWithQuery(inventoryItem);
+                                inventoryLevelService.saveWithQuery(inventoryLevel);
+                                priceSetService.saveWithQuery(priceSet);
+                                priceService.saveWithQuery(price);
+                                productSalesChannelService.saveWithQuery(productSalesChannel);
+                                productService.saveWithQuery(product);
+                                productVariantInventoryItemService.saveWithQuery(productVariantInventoryItem);
+                                productVariantService.saveWithQuery(productVariant);
                             }
                         } catch (Exception e) {
                             logger.info("Error occurred while saving product: {}", item.getTecDocld());
                             System.out.println(item);
+                            System.out.println(e);
                         }
                     });
         } catch (IOException e) {
@@ -181,7 +180,5 @@ public class CsvService {
         } catch (CsvDownloadException | NoDataException | SavingCsvException | CsvConversionException e) {
             logger.error("Error occurred during application initialization: {}", e.getMessage(), e);
         }
-//        List<Article> articles = tecDocService.fetchArticles("2140449", "94").block();
-//        System.out.println(articles);
     }
 }

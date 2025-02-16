@@ -1,28 +1,20 @@
 package cz.pps.auto_dl_be.model.medusa;
 
 import cz.pps.auto_dl_be.dto.detail.Article;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "price_set", schema = "public")
+@Component
 @Getter
 @Setter
 @NoArgsConstructor
 public class PriceSet {
-    @Id
-    @Column(name = "id", nullable = false)
     private String id;
-    @Column(name = "created_at", nullable = true)
     private String created_at;
-    @Column(name = "updated_at", nullable = true)
     private String updated_at;
 
     public PriceSet(Article article) {

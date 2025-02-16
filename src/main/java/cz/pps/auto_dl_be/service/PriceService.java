@@ -1,0 +1,21 @@
+package cz.pps.auto_dl_be.service;
+
+import cz.pps.auto_dl_be.model.medusa.Price;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.transaction.Transactional;
+import org.springframework.stereotype.Service;
+
+@Service
+public class PriceService {
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    @Transactional
+    public void saveWithQuery(Price price) {
+        String sql = "INSERT INTO PRICE (id, title, price_set_id, currency_code, raw_amount, rules_count, created_at, updated_at, deleted_at, price_list_id, amount, min_quantity, max_quantity) " +
+                "VALUES ('" + price.getId() + "', '" + price.getTitle() + "', '" + price.getPrice_set_id() + "', '" + price.getCurrency_code() + "', " +
+                "'{\"value\": \"" + price.getAmount() + "\", \"precision\": 2}'::jsonb, 0, NOW(), NOW(), NULL, NULL, " + price.getAmount() + ", NULL, NULL);";
+        entityManager.createNativeQuery(sql).executeUpdate();
+    }
+}
