@@ -26,7 +26,7 @@ public class PriceSet {
     private String updated_at;
 
     public PriceSet(Article article) {
-        this.id = "pset_" + article.getArticleNumber();
+        this.id = "pset_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
         this.created_at = LocalDateTime.now().toString();
         this.updated_at = LocalDateTime.now().toString();
     }

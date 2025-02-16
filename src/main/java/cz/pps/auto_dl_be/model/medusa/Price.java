@@ -25,16 +25,15 @@ public class Price {
     @Column(name = "currency_code", nullable = true)
     private String currency_code;
     @Column(name = "raw_amount", nullable = true)
-    private String raw_amount;
+    private String raw_amount = null;
     @Column(name = "amount", nullable = true)
     private String amount;
 
-    public Price(Article article, String raw_amount, String amount) {
-        this.id = "price_" + article.getArticleNumber();
-        this.title = article.getMfrName() + article.getArticleNumber();
-        this.price_set_id = "pset_" + article.getArticleNumber();
+    public Price(Article article, String amount) {
+        this.id = "price_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
+        this.title = article.getMfrName() + " " + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
+        this.price_set_id = "pset_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
         this.currency_code = "czk";
-        this.raw_amount = raw_amount;
         this.amount = amount;
     }
 }

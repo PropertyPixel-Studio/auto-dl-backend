@@ -24,8 +24,8 @@ public class ProductSalesChannel {
     private String sales_channel_id;
 
     public ProductSalesChannel(Article article) {
-        this.id = "prodsc_" + article.getArticleNumber();
-        this.product_id = "prod_" + article.getArticleNumber();
+        this.id = "prodsc_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
+        this.product_id = "prod_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
         this.sales_channel_id = "sc_01JKBX85GG5BV0533D14VDY1RB";
     }
 }

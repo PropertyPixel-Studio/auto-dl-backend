@@ -9,6 +9,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.text.Normalizer;
+
 @Entity
 @Table(name = "product", schema = "public")
 @Getter
@@ -30,20 +32,27 @@ public class Product {
     private String subtitle;
     @Column(name = "description", nullable = true)
     private String description;
+    @Column(name = "metadata", nullable = true)
+    private String supplier_id;
 
-    public Product(Article article) {
-        this.id = "prod_" + article.getArticleNumber();
+    public Product(Article article, String supplier_id) {
+        this.id = "prod_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
         this.title = getTitle(article);
-        this.handle = this.title.toLowerCase().replace(" ", "-").replace(",", "");
-        this.thumbnail = article.getImages().getFirst().getImageURL400();
-        this.externalId = article.getGenericArticles().getFirst().getLegacyArticleId().toString();
-        this.subtitle = article.getGenericArticles().getFirst().getAssemblyGroupName();
-        this.description = article.getGenericArticles().getFirst().getGenericArticleDescription();
+        this.handle = this.title != null ? Normalizer.normalize(this.title, Normalizer.Form.NFD)
+                .replace(" ", "-").replace(",", "")
+                .replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+                .toLowerCase()
+                .replaceAll("[^a-z0-9-_]", "") : null;
+        this.thumbnail = (article.getImages() != null && !article.getImages().isEmpty()) ? article.getImages().getFirst().getImageURL400() : null;
+        this.externalId = (article.getGenericArticles() != null && !article.getGenericArticles().isEmpty()) ? article.getGenericArticles().getFirst().getLegacyArticleId().toString() : null;
+        this.subtitle = (article.getGenericArticles() != null && !article.getGenericArticles().isEmpty()) ? article.getGenericArticles().getFirst().getAssemblyGroupName() : null;
+        this.description = (article.getGenericArticles() != null && !article.getGenericArticles().isEmpty()) ? article.getGenericArticles().getFirst().getGenericArticleDescription() : null;
+        this.supplier_id = supplier_id;
     }
 
     private static String getTitle(Article article) {
-        return article.getGenericArticles().getFirst().getGenericArticleDescription() +
-                " " + article.getMfrName() +
-                " " + article.getArticleNumber();
+        return (article.getGenericArticles() != null && !article.getGenericArticles().isEmpty()) ?
+                article.getGenericArticles().getFirst().getGenericArticleDescription() + " " + article.getMfrName() + " " + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "") :
+                article.getMfrName() + " " + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
     }
 }

@@ -102,17 +102,6 @@ public class TecDocService {
                 .map(this::extractArticles); // Extract articles from response
     }
 
-    public Mono<String> fetchDetailXml(String searchQuery, String dataSupplierIds) {
-        String xmlContent = getDetailXmlTemplate(searchQuery, dataSupplierIds);
-        return webClient.post()
-                .uri(tecDocUrl)
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
-                .header("X-API-KEY", tecDocKey)
-                .bodyValue(xmlContent)
-                .retrieve()
-                .bodyToMono(String.class); // Get raw XML response
-    }
-
     public List<Article> extractArticles(Detail detail) {
         return Optional.ofNullable(detail)
                 .map(Detail::getBody)

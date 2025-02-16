@@ -1,17 +1,20 @@
 package cz.pps.auto_dl_be.service;
 
-import cz.pps.auto_dl_be.dao.ItemDao;
+import cz.pps.auto_dl_be.dao.*;
 import cz.pps.auto_dl_be.dto.brands.Brand;
+import cz.pps.auto_dl_be.dto.detail.Article;
 import cz.pps.auto_dl_be.exception.CsvConversionException;
 import cz.pps.auto_dl_be.exception.CsvDownloadException;
 import cz.pps.auto_dl_be.exception.NoDataException;
 import cz.pps.auto_dl_be.exception.SavingCsvException;
 import cz.pps.auto_dl_be.model.Item;
+import cz.pps.auto_dl_be.model.medusa.*;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -26,7 +29,15 @@ import java.util.stream.Collectors;
 public class CsvService {
 
     private static final Logger logger = LoggerFactory.getLogger(CsvService.class);
-    private final ItemDao itemDao;
+//    private final ItemDao itemDao;
+    private final InventoryItemDao inventoryItemDao;
+    private final InventoryLevelDao inventoryLevelDao;
+    private final PriceDao priceDao;
+    private final PriceSetDao priceSetDao;
+    private final ProductDao productDao;
+    private final ProductSalesChannelDao productSalesChannelDao;
+    private final ProductVariantDao productVariantDao;
+    private final ProductVariantInventoryItemDao productVariantInventoryItemDao;
     private final TecDocService tecDocService;
     @Value("${darma.url}")
     private String apiUrl;
@@ -121,13 +132,48 @@ public class CsvService {
                             item.setTecDocSupplierID(String.valueOf(dataSupplierId));
                         }
                     })
-                    .forEach(itemDao::save);
+                    .limit(1)
+                    .forEach(item -> {
+//                        itemDao.save(item);
+                        // Fetch articles from TecDocService
+                        List<Article> articles = tecDocService.fetchArticles(item.getTecDocld(), item.getTecDocSupplierID()).block();
+                        try {
+                            if (articles != null && !articles.isEmpty()) {
+                                // Get the first article
+                                Article firstArticle = articles.getFirst();
+
+                                // Create objects from the first article
+                                InventoryItem inventoryItem = new InventoryItem(firstArticle);
+                                InventoryLevel inventoryLevel = new InventoryLevel(firstArticle, item.getMainStock());
+                                Price price = new Price(firstArticle, item.getPrice());
+                                PriceSet priceSet = new PriceSet(firstArticle);
+                                Product product = new Product(firstArticle, item.getTecDocSupplierID());
+                                ProductSalesChannel productSalesChannel = new ProductSalesChannel(firstArticle);
+                                ProductVariant productVariant = new ProductVariant(firstArticle);
+                                ProductVariantInventoryItem productVariantInventoryItem = new ProductVariantInventoryItem(firstArticle);
+                                // Save the Product object using ProductDao
+                                inventoryItemDao.save(inventoryItem);
+                                inventoryLevelDao.save(inventoryLevel);
+                                priceDao.save(price);
+                                priceSetDao.save(priceSet);
+                                productDao.save(product);
+                                productSalesChannelDao.save(productSalesChannel);
+                                productVariantDao.save(productVariant);
+                                productVariantInventoryItemDao.save(productVariantInventoryItem);
+                            }
+                        } catch (Exception e) {
+                            logger.info("Error occurred while saving product: {}", item.getTecDocld());
+                            System.out.println(item);
+                        }
+                    });
         } catch (IOException e) {
             throw new CsvConversionException("Failed to convert CSV data to items", e);
         }
+        logger.info("CSV data has been successfully converted to items and saved to the database");
     }
 
     @PostConstruct
+    @Async
     public void init() {
         try {
             downloadAndSaveCsvAsItems();

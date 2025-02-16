@@ -26,14 +26,19 @@ public class InventoryItem {
     private String description;
 
     public InventoryItem(Article article) {
-        this.id = "iitem_" + article.getArticleNumber();
-        this.sku = article.getArticleNumber();
-        this.title = article.getMfrName() + article.getArticleNumber();
+        this.id = "iitem_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
+        this.sku = article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
+        this.title = article.getMfrName() + " " + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
         this.description = getDescription(article);
     }
 
     private static String getDescription(Article article) {
-        return article.getGenericArticles().getFirst().getAssemblyGroupName() +
-                "-" + article.getGenericArticles().getFirst().getGenericArticleDescription();
+        if (article.getGenericArticles() != null && !article.getGenericArticles().isEmpty()) {
+            var genericArticle = article.getGenericArticles().getFirst();
+            if (genericArticle != null) {
+                return genericArticle.getAssemblyGroupName() + " - " + genericArticle.getGenericArticleDescription();
+            }
+        }
+        return null;
     }
 }

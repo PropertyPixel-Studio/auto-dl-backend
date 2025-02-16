@@ -25,13 +25,12 @@ public class InventoryLevel {
     @Column(name = "stocked_quantity", nullable = true)
     private String stocked_quantity;
     @Column(name = "raw_stocked_quantity", nullable = true)
-    private String raw_stocked_quantity;
+    private String raw_stocked_quantity = null;
 
-    public InventoryLevel(Article article, String stocked_quantity, String raw_stocked_quantity) {
-        this.id = "ilev_" + article.getArticleNumber();
-        this.inventory_item_id = "iitem_" + article.getArticleNumber();
+    public InventoryLevel(Article article, String stocked_quantity) {
+        this.id = "ilev_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
+        this.inventory_item_id = "iitem_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
         this.location_id = "sloc_01JKBYKSP3NSJJCJG7FKKKPNS8";
         this.stocked_quantity = stocked_quantity;
-        this.raw_stocked_quantity = raw_stocked_quantity;
     }
 }
