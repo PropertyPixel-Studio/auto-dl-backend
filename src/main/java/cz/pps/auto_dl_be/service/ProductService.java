@@ -17,7 +17,7 @@ public class ProductService {
         String sql = "INSERT INTO PRODUCT (id, title, handle, subtitle, description, is_giftcard, status, thumbnail, weight, length, height, width, origin_country, hs_code, mid_code, material, collection_id, type_id, discountable, external_id, created_at, updated_at, metadata) " +
                      "VALUES ('" + product.getId() + "', '" + product.getTitle() + "', '" + product.getHandle() + "', '" + product.getSubtitle() + "', '" + product.getDescription() + "', " +
                      "FALSE, 'published', '" + product.getThumbnail() + "', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, TRUE, '" + product.getExternalId() + "', NOW(), NOW(), " +
-                     "'{\"dataSupplierId\": " + product.getSupplierId() + ", \"articleNumber\": \"" + product.getId() + "\"}'::jsonb);";
+                     "'{\"dataSupplierId\": " + product.getSupplierId() + ", \"articleNumber\": \"" + product.getTecDocId() + "\"}'::jsonb);";
         entityManager.createNativeQuery(sql).executeUpdate();
     }
 }

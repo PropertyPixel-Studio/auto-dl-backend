@@ -21,6 +21,7 @@ public class Product {
     private String subtitle;
     private String description;
     private String supplierId;
+    private String tecDocId;
 
     public Product(Article article, String supplierId) {
         this.id = "prod_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
@@ -35,6 +36,7 @@ public class Product {
         this.subtitle = (article.getGenericArticles() != null && !article.getGenericArticles().isEmpty()) ? article.getGenericArticles().getFirst().getAssemblyGroupName() : null;
         this.description = (article.getGenericArticles() != null && !article.getGenericArticles().isEmpty()) ? article.getGenericArticles().getFirst().getGenericArticleDescription() : null;
         this.supplierId = supplierId;
+        this.tecDocId = article.getArticleNumber();
     }
 
     private static String getTitle(Article article) {

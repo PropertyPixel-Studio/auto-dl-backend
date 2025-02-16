@@ -37,6 +37,7 @@ public class CsvService {
     private final ProductService productService;
     private final ProductVariantInventoryItemService productVariantInventoryItemService;
     private final ProductVariantService productVariantService;
+    private final ProductVariantPriceSetService productVariantPriceSetService;
     @Value("${darma.url}")
     private String apiUrl;
     private final String[] testBrand = {"Herth+Buss Elparts", "METZGER", "FEBI BILSTEIN", "JP GROUP", "vika", "FAST", "OREX", "TOTAL"};
@@ -148,6 +149,7 @@ public class CsvService {
                                 Product product = new Product(firstArticle, item.getTecDocSupplierID());
                                 ProductVariantInventoryItem productVariantInventoryItem = new ProductVariantInventoryItem(firstArticle);
                                 ProductVariant productVariant = new ProductVariant(firstArticle);
+                                ProductVariantPriceSet productVariantPriceSet = new ProductVariantPriceSet(firstArticle);
 
                                 // Save objects to the database
                                 inventoryItemService.saveWithQuery(inventoryItem);
@@ -158,6 +160,7 @@ public class CsvService {
                                 productService.saveWithQuery(product);
                                 productVariantInventoryItemService.saveWithQuery(productVariantInventoryItem);
                                 productVariantService.saveWithQuery(productVariant);
+                                productVariantPriceSetService.saveWithQuery(productVariantPriceSet);
                             }
                         } catch (Exception e) {
                             logger.info("Error occurred while saving product: {}", item.getTecDocld());
