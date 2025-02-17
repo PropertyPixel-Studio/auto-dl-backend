@@ -17,7 +17,17 @@ public class InventoryLevelService {
                 "VALUES ('" + inventoryLevel.getId() + "', '" + inventoryLevel.getInventory_item_id() + "', '" + inventoryLevel.getLocation_id() + "', " + inventoryLevel.getStocked_quantity() + ", 0, 0, " +
                 "'{\"value\": \"" + inventoryLevel.getStocked_quantity() + "\", \"precision\": 20}'::jsonb, " +
                 "'{\"value\": \"0\", \"precision\": 20}'::jsonb, " +
-                "'{\"value\": \"0\", \"precision\": 20}'::jsonb, NOW(), NOW(), NULL);";
+                "'{\"value\": \"0\", \"precision\": 20}'::jsonb, NOW(), NOW(), NULL)" +
+                "ON CONFLICT (id) DO UPDATE SET " +
+                "inventory_item_id = EXCLUDED.inventory_item_id, " +
+                "location_id = EXCLUDED.location_id, " +
+                "stocked_quantity = EXCLUDED.stocked_quantity, " +
+                "reserved_quantity = EXCLUDED.reserved_quantity, " +
+                "incoming_quantity = EXCLUDED.incoming_quantity, " +
+                "raw_stocked_quantity = EXCLUDED.raw_stocked_quantity, " +
+                "raw_reserved_quantity = EXCLUDED.raw_reserved_quantity, " +
+                "raw_incoming_quantity = EXCLUDED.raw_incoming_quantity, " +
+                "updated_at = NOW();";
         entityManager.createNativeQuery(sql).executeUpdate();
     }
 }

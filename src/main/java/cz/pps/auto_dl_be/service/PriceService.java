@@ -15,7 +15,14 @@ public class PriceService {
     public void saveWithQuery(Price price) {
         String sql = "INSERT INTO PRICE (id, title, price_set_id, currency_code, raw_amount, rules_count, created_at, updated_at, deleted_at, price_list_id, amount, min_quantity, max_quantity) " +
                 "VALUES ('" + price.getId() + "', '" + price.getTitle() + "', '" + price.getPrice_set_id() + "', '" + price.getCurrency_code() + "', " +
-                "'{\"value\": \"" + price.getAmount() + "\", \"precision\": 2}'::jsonb, 0, NOW(), NOW(), NULL, NULL, " + price.getAmount() + ", NULL, NULL);";
+                "'{\"value\": \"" + price.getAmount() + "\", \"precision\": 2}'::jsonb, 0, NOW(), NOW(), NULL, NULL, " + price.getAmount() + ", NULL, NULL)" +
+                "ON CONFLICT (id) DO UPDATE SET " +
+                "title = EXCLUDED.title, " +
+                "price_set_id = EXCLUDED.price_set_id, " +
+                "currency_code = EXCLUDED.currency_code, " +
+                "raw_amount = EXCLUDED.raw_amount, " +
+                "amount = EXCLUDED.amount, " +
+                "updated_at = NOW();";
         entityManager.createNativeQuery(sql).executeUpdate();
     }
 }

@@ -21,6 +21,7 @@ import java.io.*;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -92,7 +93,8 @@ public class CsvService {
         return csvFile;
     }
 
-    public void downloadAndSaveCsvAsItems() throws CsvDownloadException, NoDataException, SavingCsvException, CsvConversionException {
+    @Async
+    public void downloadAndSaveCsvAsItems(Integer limit) throws CsvDownloadException, NoDataException, SavingCsvException, CsvConversionException {
         // Step 1: Download the CSV file from the API
         File csvFile = getCsvFile(this.apiUrl);
 
@@ -103,7 +105,7 @@ public class CsvService {
         }
 
         // Step 3: Read the CSV file and save data as Item entities
-        convertToItems(csvFile, brands);
+        convertToItems(csvFile, brands, limit);
 
         // Step 4: Delete the CSV file
         if (csvFile.exists()) {
@@ -111,7 +113,7 @@ public class CsvService {
         }
     }
 
-    private void convertToItems(File csvFile, List<Brand> brands) throws CsvConversionException {
+    private void convertToItems(File csvFile, List<Brand> brands, Integer limit) throws CsvConversionException {
         // Create a map of TecDocSupplierName to dataSupplierId
         Map<String, Integer> brandMap = brands.stream()
                 .collect(Collectors.toMap(Brand::getMfrName, Brand::getDataSupplierId));
@@ -123,7 +125,10 @@ public class CsvService {
                     .filter(item -> item.getManufacturer() != null &&
                             Arrays.stream(testBrand).anyMatch(item.getManufacturer()::contains) &&
                             item.getTecDocSupplierName() != null &&
-                            item.getTecDocld() != null)
+                            item.getTecDocld() != null &&
+                            (!Objects.equals(item.getMainStock(), "0") ||
+                            !Objects.equals(item.getSupplierStock(), "0") ||
+                            !Objects.equals(item.getOtherBranchStock(), "0")))
                     .peek(item -> {
                         // Pair TecDocSupplierName to dataSupplierId
                         Integer dataSupplierId = brandMap.get(item.getTecDocSupplierName());
@@ -131,7 +136,7 @@ public class CsvService {
                             item.setTecDocSupplierID(String.valueOf(dataSupplierId));
                         }
                     })
-                    .limit(1)
+                    .limit(limit)
                     .forEach(item -> {
                         // Fetch articles from TecDocService
                         List<Article> articles = tecDocService.fetchArticles(item.getTecDocld(), item.getTecDocSupplierID()).block();
@@ -142,7 +147,7 @@ public class CsvService {
 
                                 // Create objects from the first article
                                 InventoryItem inventoryItem = new InventoryItem(firstArticle);
-                                InventoryLevel inventoryLevel = new InventoryLevel(firstArticle, item.getMainStock());
+                                InventoryLevel inventoryLevel = new InventoryLevel(firstArticle, item.getMainStock(), item.getSupplierStock(), item.getOtherBranchStock());
                                 Price price = new Price(firstArticle, item.getPrice());
                                 PriceSet priceSet = new PriceSet(firstArticle);
                                 ProductSalesChannel productSalesChannel = new ProductSalesChannel(firstArticle);
@@ -164,24 +169,11 @@ public class CsvService {
                             }
                         } catch (Exception e) {
                             logger.info("Error occurred while saving product: {}", item.getTecDocld());
-                            System.out.println(item);
-                            System.out.println(e);
                         }
                     });
         } catch (IOException e) {
             throw new CsvConversionException("Failed to convert CSV data to items", e);
         }
         logger.info("CSV data has been successfully converted to items and saved to the database");
-    }
-
-    @PostConstruct
-    @Async
-    public void init() {
-        try {
-            downloadAndSaveCsvAsItems();
-            logger.info("Application has finished loading and is ready.");
-        } catch (CsvDownloadException | NoDataException | SavingCsvException | CsvConversionException e) {
-            logger.error("Error occurred during application initialization: {}", e.getMessage(), e);
-        }
     }
 }
