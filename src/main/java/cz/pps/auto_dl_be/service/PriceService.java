@@ -25,4 +25,14 @@ public class PriceService {
                 "updated_at = NOW();";
         entityManager.createNativeQuery(sql).executeUpdate();
     }
+
+    @Transactional
+    public void updateAmount(Price price) {
+        String sql = "UPDATE PRICE SET " +
+                "raw_amount = '{\"value\": \"" + price.getAmount() + "\", \"precision\": 2}'::jsonb, " +
+                "amount = " + price.getAmount() + ", " +
+                "updated_at = NOW() " +
+                "WHERE id = '" + price.getId() + "';";
+        entityManager.createNativeQuery(sql).executeUpdate();
+    }
 }

@@ -30,4 +30,14 @@ public class InventoryLevelService {
                 "updated_at = NOW();";
         entityManager.createNativeQuery(sql).executeUpdate();
     }
+
+    @Transactional
+    public void updateStockedQuantity(InventoryLevel inventoryLevel) {
+        String sql = "UPDATE INVENTORY_LEVEL SET " +
+                "stocked_quantity = " + inventoryLevel.getStocked_quantity() + ", " +
+                "raw_stocked_quantity = '{\"value\": \"" + inventoryLevel.getStocked_quantity() + "\", \"precision\": 20}'::jsonb, " +
+                "updated_at = NOW() " +
+                "WHERE id = '" + inventoryLevel.getId() + "';";
+        entityManager.createNativeQuery(sql).executeUpdate();
+    }
 }

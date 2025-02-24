@@ -27,6 +27,11 @@ public class InventoryLevel {
         this.raw_stocked_quantity = this.stocked_quantity;
     }
 
+    public InventoryLevel(String stocked_quantity, String supplierStock, String otherBranchStock) {
+        this.stocked_quantity = parseQuantity(stocked_quantity, supplierStock, otherBranchStock);
+        this.raw_stocked_quantity = this.stocked_quantity;
+    }
+
     private Integer parseQuantity(String stocked_quantity, String supplierStock, String otherBranchStock) {
         if (Objects.equals(stocked_quantity, ">4") || Objects.equals(supplierStock, ">4") || Objects.equals(otherBranchStock, ">4")) {
             return 5;

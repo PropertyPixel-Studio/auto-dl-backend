@@ -26,4 +26,9 @@ public class Price {
         this.raw_amount = amount;
         this.amount = amount;
     }
+
+    public Price(String amount) {
+        this.raw_amount = amount;
+        this.amount = amount;
+    }
 }
