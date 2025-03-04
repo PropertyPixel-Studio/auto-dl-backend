@@ -161,12 +161,12 @@ public class CsvService {
             ProductVariant productVariant = new ProductVariant(article);
             ProductVariantPriceSet productVariantPriceSet = new ProductVariantPriceSet(article);
 
+            productService.saveWithQuery(product);
             inventoryItemService.saveWithQuery(inventoryItem);
             inventoryLevelService.saveWithQuery(inventoryLevel);
             priceSetService.saveWithQuery(priceSet);
             priceService.saveWithQuery(price);
             productSalesChannelService.saveWithQuery(productSalesChannel);
-            productService.saveWithQuery(product);
             productVariantInventoryItemService.saveWithQuery(productVariantInventoryItem);
             productVariantService.saveWithQuery(productVariant);
             productVariantPriceSetService.saveWithQuery(productVariantPriceSet);

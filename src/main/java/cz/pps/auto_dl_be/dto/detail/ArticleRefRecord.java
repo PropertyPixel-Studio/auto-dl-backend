@@ -28,4 +28,16 @@ public class ArticleRefRecord {
     @JacksonXmlProperty(localName = "referenceTypeDescription")
     private String referenceTypeDescription;
 
+    @Override
+    public String toString() {
+        return "{" +
+                "\"articleNumber\": \"" + articleNumber + "\"," +
+                "\"dataSupplierId\": " + dataSupplierId + "," +
+                "\"mfrId\": " + mfrId + "," +
+                "\"mfrName\": \"" + mfrName + "\"," +
+                "\"matchesSearchQuery\": " + matchesSearchQuery + "," +
+                "\"referenceTypeKey\": \"" + referenceTypeKey + "\"," +
+                "\"referenceTypeDescription\": \"" + referenceTypeDescription + "\"" +
+                "}";
+    }
 }

@@ -23,6 +23,7 @@ public class Product {
     private String supplierId;
     private String tecDocId;
     private String mfrName;
+    private String oemNumber;
 
     public Product(Article article, String supplierId) {
         this.id = "prod_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
@@ -39,6 +40,7 @@ public class Product {
         this.supplierId = supplierId;
         this.tecDocId = article.getArticleNumber();
         this.mfrName = article.getMfrName();
+        this.oemNumber = article.getOemNumbers().toString();
     }
 
     private static String getTitle(Article article) {

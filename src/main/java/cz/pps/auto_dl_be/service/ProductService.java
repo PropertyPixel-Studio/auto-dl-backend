@@ -17,8 +17,7 @@ public class ProductService {
     public void saveWithQuery(Product product) {
         String sql = "INSERT INTO PRODUCT (id, title, handle, subtitle, description, is_giftcard, status, thumbnail, weight, length, height, width, origin_country, hs_code, mid_code, material, collection_id, type_id, discountable, external_id, created_at, updated_at, metadata) " +
                 "VALUES ('" + product.getId() + "', '" + product.getTitle() + "', '" + product.getHandle() + "', '" + product.getSubtitle() + "', '" + product.getDescription() + "', " +
-                "FALSE, 'published', '" + product.getThumbnail() + "', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, TRUE, '" + product.getExternalId() + "', NOW(), NOW(), " +
-                "'{\"dataSupplierId\": " + product.getSupplierId() + ", \"articleNumber\": \"" + product.getTecDocId() + "\", \"mfrName\": \"" + product.getMfrName() + "\"}'::jsonb)" +
+                "FALSE, 'published', '" + product.getThumbnail() + "', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, TRUE, '" + product.getExternalId() + "', NOW(), NOW(), " + getJSON(product) +
                 "ON CONFLICT (id) DO UPDATE SET " +
                 "title = EXCLUDED.title, " +
                 "handle = EXCLUDED.handle, " +
@@ -33,8 +32,7 @@ public class ProductService {
 
     @Transactional
     public Product findById(String id) {
-        // TODO: remove dots and stuff from id
-        String sql = "SELECT id, title, handle, subtitle, description, thumbnail, external_id, metadata->>'dataSupplierId' AS supplierId, metadata->>'articleNumber' AS tecDocId, metadata->>'mfrName' AS mfrName " +
+        String sql = "SELECT id, title, handle, subtitle, description, thumbnail, external_id, metadata->>'dataSupplierId' AS supplierId, metadata->>'articleNumber' AS tecDocId, metadata->>'mfrName' AS mfrName, metadata->>'eomNumber' AS oemNumber " +
                 "FROM PRODUCT WHERE id = :id";
         try {
             Object[] result = (Object[]) entityManager.createNativeQuery(sql)
@@ -44,6 +42,16 @@ public class ProductService {
         } catch (NoResultException e) {
             return null;
         }
+    }
+
+    private static String getJSON(Product product) {
+        String json = "'{" +
+                "\"dataSupplierId\": " + product.getSupplierId() +
+                ", \"articleNumber\": \"" + product.getTecDocId() +
+                "\", \"mfrName\": \"" + product.getMfrName() +
+                "\", \"oemNumber\": " + product.getOemNumber() +
+                "}'::jsonb)";
+        return json;
     }
 
     private static Product getProduct(Object[] result) {
@@ -58,6 +66,7 @@ public class ProductService {
         product.setSupplierId((String) result[7]);
         product.setTecDocId((String) result[8]);
         product.setMfrName((String) result[9]);
+        product.setOemNumber((String) result[10]);
         return product;
     }
 }
