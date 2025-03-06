@@ -50,8 +50,8 @@ public class ProductService {
 
     private static String getJSON(Product product) {
         String json = "'{" +
-                "\"dataSupplierId\": " + product.getSupplierId() +
-                ", \"articleNumber\": \"" + product.getTecDocId() +
+                "\"dataSupplierId\": \"" + product.getSupplierId() +
+                "\", \"articleNumber\": \"" + product.getTecDocId() +
                 "\", \"mfrName\": \"" + product.getMfrName() +
                 "\", \"oemNumber\": " + product.getOemNumber() +
                 "}'::jsonb)";
