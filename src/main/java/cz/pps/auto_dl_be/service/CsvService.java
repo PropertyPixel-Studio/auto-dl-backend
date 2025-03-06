@@ -42,10 +42,10 @@ public class CsvService {
     private final String[] testBrand = {"Herth+Buss Elparts", "METZGER", "FEBI BILSTEIN", "JP GROUP", "vika", "FAST", "OREX", "TOTAL"};
 
     @Async
-    public void downloadAndSaveCsvAsItems(Integer limit) throws CsvDownloadException, NoDataException, SavingCsvException, CsvConversionException {
+    public void downloadAndSaveCsvAsItems() throws CsvDownloadException, NoDataException, SavingCsvException, CsvConversionException {
         File csvFile = getCsvFile(apiUrl);
         List<Brand> brands = fetchBrands();
-        convertToItemsAndSave(csvFile, brands, limit);
+        convertToItemsAndSave(csvFile, brands);
         deleteCsvFile(csvFile);
     }
 
@@ -94,7 +94,7 @@ public class CsvService {
         return brands;
     }
 
-    private void convertToItemsAndSave(File csvFile, List<Brand> brands, Integer limit) throws CsvConversionException {
+    private void convertToItemsAndSave(File csvFile, List<Brand> brands) throws CsvConversionException {
         Map<String, Integer> brandMap = createBrandMap(brands);
 
         try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
@@ -103,7 +103,6 @@ public class CsvService {
                     .map(this::getItem)
                     .filter(this::isValidItem)
                     .peek(item -> pairTecDocSupplierNameToDataSupplierId(item, brandMap))
-//                    .limit(limit)
                     .forEach(this::processItem);
         } catch (IOException e) {
             throw new CsvConversionException("Failed to convert CSV data to items", e);
