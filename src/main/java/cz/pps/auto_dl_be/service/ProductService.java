@@ -32,7 +32,11 @@ public class ProductService {
 
     @Transactional
     public Product findById(String id) {
-        String sql = "SELECT id, title, handle, subtitle, description, thumbnail, external_id, metadata->>'dataSupplierId' AS supplierId, metadata->>'articleNumber' AS tecDocId, metadata->>'mfrName' AS mfrName, metadata->>'eomNumber' AS oemNumber " +
+        String sql = "SELECT id, title, handle, subtitle, description, thumbnail, external_id, " +
+                "metadata->>'dataSupplierId' AS supplierId, " +
+                "metadata->>'articleNumber' AS tecDocId, " +
+                "metadata->>'mfrName' AS mfrName, " +
+                "metadata->>'oemNumber' AS oemNumber " +
                 "FROM PRODUCT WHERE id = :id";
         try {
             Object[] result = (Object[]) entityManager.createNativeQuery(sql)
