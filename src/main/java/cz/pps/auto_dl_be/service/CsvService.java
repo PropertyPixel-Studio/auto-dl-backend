@@ -41,7 +41,7 @@ public class CsvService {
 
     private final String[] testBrand = {"Herth+Buss Elparts", "METZGER", "FEBI BILSTEIN", "JP GROUP", "vika", "FAST", "OREX", "TOTAL"};
 
-//    @Async
+    @Async
     public void downloadAndSaveCsvAsItems() throws CsvDownloadException, NoDataException, SavingCsvException, CsvConversionException {
         logger.info("Downloading CSV data from Darma");
         File csvFile = getCsvFile(apiUrl);
