@@ -31,9 +31,6 @@ public class ApiKeyFilter extends GenericFilterBean {
 
         String apiKey = httpRequest.getHeader(API_KEY_HEADER);
 
-        System.out.println(apiKey);
-        System.out.println(VALID_API_KEY);
-
         if (apiKey == null || !apiKey.equals(VALID_API_KEY)) {
             httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid API Key");
             return;
