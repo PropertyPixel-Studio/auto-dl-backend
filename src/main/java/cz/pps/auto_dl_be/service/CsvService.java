@@ -43,8 +43,10 @@ public class CsvService {
 
     @Async
     public void downloadAndSaveCsvAsItems() throws CsvDownloadException, NoDataException, SavingCsvException, CsvConversionException {
+        logger.info("Downloading CSV data from Darma");
         File csvFile = getCsvFile(apiUrl);
         List<Brand> brands = fetchBrands();
+        logger.info("Fetched brands from TecDoc API");
         convertToItemsAndSave(csvFile, brands);
         deleteCsvFile(csvFile);
     }
@@ -54,6 +56,7 @@ public class CsvService {
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(100 * 1024 * 1024))
                 .build();
         String csvData = downloadCsvData(webClient, apiUrl);
+        logger.info("CSV data has been successfully downloaded from Darma");
         return saveCsvDataToFile(csvData);
     }
 
@@ -79,6 +82,7 @@ public class CsvService {
         File csvFile = new File("data.csv");
         try (FileWriter writer = new FileWriter(csvFile)) {
             writer.write(csvData);
+            logger.info("CSV data has been successfully saved to file");
         } catch (IOException e) {
             logger.error("Error occurred while saving CSV data to file: {}", e.getMessage(), e);
             throw new SavingCsvException("Failed to write CSV data to file", e);
@@ -170,7 +174,7 @@ public class CsvService {
             productVariantService.saveWithQuery(productVariant);
             productVariantPriceSetService.saveWithQuery(productVariantPriceSet);
         } catch (Exception e) {
-            logger.info("Error occurred while saving product: {}", item.getTecDocld());
+            logger.info("Error occurred while saving product: {}, error: {}", item.getTecDocld(), e.getMessage());
         }
     }
 

@@ -40,7 +40,7 @@ public class Product {
         this.supplierId = supplierId;
         this.tecDocId = article.getArticleNumber();
         this.mfrName = article.getMfrName();
-        this.oemNumber = article.getOemNumbers().toString();
+        this.oemNumber = (article.getOemNumbers() != null) ? article.getOemNumbers().toString() : null;
     }
 
     private static String getTitle(Article article) {

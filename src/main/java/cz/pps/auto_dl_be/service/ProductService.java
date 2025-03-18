@@ -17,7 +17,7 @@ public class ProductService {
     public void saveWithQuery(Product product) {
         String sql = "INSERT INTO PRODUCT (id, title, handle, subtitle, description, is_giftcard, status, thumbnail, weight, length, height, width, origin_country, hs_code, mid_code, material, collection_id, type_id, discountable, external_id, created_at, updated_at, metadata) " +
                 "VALUES ('" + product.getId() + "', '" + product.getTitle() + "', '" + product.getHandle() + "', '" + product.getSubtitle() + "', '" + product.getDescription() + "', " +
-                "FALSE, 'published', '" + product.getThumbnail() + "', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, TRUE, '" + product.getExternalId() + "', NOW(), NOW(), " + getJSON(product) +
+                "FALSE, 'published', '" + product.getThumbnail() + "', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, TRUE, '" + product.getExternalId() + "', NOW(), NOW(), " + getJSON(product) + ") " +
                 "ON CONFLICT (id) DO UPDATE SET " +
                 "title = EXCLUDED.title, " +
                 "handle = EXCLUDED.handle, " +
@@ -49,13 +49,12 @@ public class ProductService {
     }
 
     private static String getJSON(Product product) {
-        String json = "'{" +
+        return "'{" +
                 "\"dataSupplierId\": " + product.getSupplierId() +
                 ", \"articleNumber\": \"" + product.getTecDocId() +
                 "\", \"mfrName\": \"" + product.getMfrName() +
                 "\", \"oemNumber\": " + product.getOemNumber() +
-                "}'::jsonb)";
-        return json;
+                "}'::jsonb";
     }
 
     private static Product getProduct(Object[] result) {
