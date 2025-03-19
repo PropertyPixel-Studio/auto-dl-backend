@@ -214,10 +214,10 @@ public class MedusaService {
             Product product = new Product(article, productEntity.getSupplierId());
             ProductVariant productVariant = new ProductVariant(article);
 
-            productService.saveWithQuery(product);
-            inventoryItemService.saveWithQuery(inventoryItem);
-            priceService.saveWithQuery(price);
-            productVariantService.saveWithQuery(productVariant);
+            productService.updateProduct(product);
+            inventoryItemService.updateInventoryItem(inventoryItem);
+            priceService.updatePrice(price);
+            productVariantService.updateProductVariant(productVariant);
         } catch (Exception e) {
             logger.info("Error occurred while updating product: {}, error: {}", productEntity.getTecDocId(), e.getMessage());
         }
