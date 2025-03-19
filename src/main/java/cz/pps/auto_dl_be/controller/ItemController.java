@@ -36,6 +36,12 @@ public class ItemController {
         }
     }
 
+    @GetMapping("/update")
+    public ResponseEntity<Void> updateItemsInB() {
+        medusaService.updateDataInDatabase();
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
     @GetMapping("/products")
     public ResponseEntity<Page<ProductEntity>> getAllProducts(
             @RequestParam(defaultValue = "0") int page,
@@ -56,5 +62,10 @@ public class ItemController {
         } catch (Exception e) {
             logger.error("Error has occured during the scheduled cron job: ", e);
         }
+    }
+
+    @Scheduled(cron = "0 0 0 1 * ?")
+    public void scheduledUpdateItemsInB() {
+        medusaService.updateDataInDatabase();
     }
 }
