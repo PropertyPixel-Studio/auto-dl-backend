@@ -219,7 +219,7 @@ public class MedusaService {
             priceService.saveWithQuery(price);
             productVariantService.saveWithQuery(productVariant);
         } catch (Exception e) {
-            logger.info("Error occurred while saving product: {}, error: {}", productEntity.getTecDocId(), e.getMessage());
+            logger.info("Error occurred while updating product: {}, error: {}", productEntity.getTecDocId(), e.getMessage());
         }
     }
 
