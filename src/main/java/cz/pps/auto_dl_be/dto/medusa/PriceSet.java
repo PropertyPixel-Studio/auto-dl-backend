@@ -1,16 +1,17 @@
 package cz.pps.auto_dl_be.dto.medusa;
 
 import cz.pps.auto_dl_be.dto.detail.Article;
+import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
 @Getter
 @Setter
 @NoArgsConstructor
+@Data
 public class PriceSet {
     private String id;
     private String created_at;

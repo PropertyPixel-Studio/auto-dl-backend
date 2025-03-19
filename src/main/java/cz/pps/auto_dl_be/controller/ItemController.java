@@ -44,12 +44,6 @@ public class ItemController {
         return new ResponseEntity<>(products, HttpStatus.OK);
     }
 
-//    @GetMapping("/update")
-//    public ResponseEntity<Void> updateItemsInDB() {
-//        productService.updateProducts();
-//        return new ResponseEntity<>(HttpStatus.OK);
-//    }
-
     @GetMapping("/heartbeat")
     public ResponseEntity<Void> heartbeat() {
         return new ResponseEntity<>(HttpStatus.OK);

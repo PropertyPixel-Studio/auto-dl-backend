@@ -1,8 +1,8 @@
 package cz.pps.auto_dl_be.service;
 
 import cz.pps.auto_dl_be.dao.ProductDao;
-import cz.pps.auto_dl_be.model.ProductEntity;
 import cz.pps.auto_dl_be.dto.medusa.Product;
+import cz.pps.auto_dl_be.model.ProductEntity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.PersistenceContext;
@@ -19,9 +19,34 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class ProductService {
 
+    private final ProductDao productDao;
     @PersistenceContext
     private EntityManager entityManager;
-    private final ProductDao productDao;
+
+    private static String getJSON(Product product) {
+        return "'{" +
+                "\"dataSupplierId\": " + product.getSupplierId() +
+                ", \"articleNumber\": \"" + product.getTecDocId() +
+                "\", \"mfrName\": \"" + product.getMfrName() +
+                "\", \"oemNumber\": " + product.getOemNumber() +
+                "}'::jsonb";
+    }
+
+    private static Product getProduct(Object[] result) {
+        Product product = new Product();
+        product.setId((String) result[0]);
+        product.setTitle((String) result[1]);
+        product.setHandle((String) result[2]);
+        product.setSubtitle((String) result[3]);
+        product.setDescription((String) result[4]);
+        product.setThumbnail((String) result[5]);
+        product.setExternalId((String) result[6]);
+        product.setSupplierId((String) result[7]);
+        product.setTecDocId((String) result[8]);
+        product.setMfrName((String) result[9]);
+        product.setOemNumber((String) result[10]);
+        return product;
+    }
 
     public Page<ProductEntity> getAllProducts(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -83,31 +108,6 @@ public class ProductService {
                 .setParameter("external_id", product.getExternalId())
                 .setParameter("id", product.getId())
                 .executeUpdate();
-    }
-
-    private static String getJSON(Product product) {
-        return "'{" +
-                "\"dataSupplierId\": " + product.getSupplierId() +
-                ", \"articleNumber\": \"" + product.getTecDocId() +
-                "\", \"mfrName\": \"" + product.getMfrName() +
-                "\", \"oemNumber\": " + product.getOemNumber() +
-                "}'::jsonb";
-    }
-
-    private static Product getProduct(Object[] result) {
-        Product product = new Product();
-        product.setId((String) result[0]);
-        product.setTitle((String) result[1]);
-        product.setHandle((String) result[2]);
-        product.setSubtitle((String) result[3]);
-        product.setDescription((String) result[4]);
-        product.setThumbnail((String) result[5]);
-        product.setExternalId((String) result[6]);
-        product.setSupplierId((String) result[7]);
-        product.setTecDocId((String) result[8]);
-        product.setMfrName((String) result[9]);
-        product.setOemNumber((String) result[10]);
-        return product;
     }
 
     public Stream<ProductEntity> getAllProductsAsStream() {

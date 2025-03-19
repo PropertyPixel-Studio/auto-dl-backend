@@ -14,13 +14,13 @@ public class InventoryItemService {
     @Transactional
     public void saveWithQuery(InventoryItem inventoryItem) {
         String sql = "INSERT INTO INVENTORY_ITEM (id, sku, title, description, created_at, updated_at, deleted_at) " +
-                     "VALUES (:id, :sku, :title, :description, NOW(), NOW(), NULL)";
+                "VALUES (:id, :sku, :title, :description, NOW(), NOW(), NULL)";
         entityManager.createNativeQuery(sql)
-                     .setParameter("id", inventoryItem.getId())
-                     .setParameter("sku", inventoryItem.getSku())
-                     .setParameter("title", inventoryItem.getTitle())
-                     .setParameter("description", inventoryItem.getDescription())
-                     .executeUpdate();
+                .setParameter("id", inventoryItem.getId())
+                .setParameter("sku", inventoryItem.getSku())
+                .setParameter("title", inventoryItem.getTitle())
+                .setParameter("description", inventoryItem.getDescription())
+                .executeUpdate();
     }
 
     @Transactional

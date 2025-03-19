@@ -14,9 +14,9 @@ public class PriceSetService {
     @Transactional
     public void saveWithQuery(PriceSet priceSet) {
         String sql = "INSERT INTO PRICE_SET (id, created_at, updated_at, deleted_at) " +
-                     "VALUES (:id, NOW(), NOW(), NULL)";
+                "VALUES (:id, NOW(), NOW(), NULL)";
         entityManager.createNativeQuery(sql)
-                     .setParameter("id", priceSet.getId())
-                     .executeUpdate();
+                .setParameter("id", priceSet.getId())
+                .executeUpdate();
     }
 }

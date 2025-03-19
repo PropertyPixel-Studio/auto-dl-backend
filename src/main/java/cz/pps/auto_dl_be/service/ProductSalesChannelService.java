@@ -14,13 +14,13 @@ public class ProductSalesChannelService {
     @Transactional
     public void saveWithQuery(ProductSalesChannel productSalesChannel) {
         String sql = "INSERT INTO PRODUCT_SALES_CHANNEL (product_id, sales_channel_id, id, created_at, updated_at, deleted_at) " +
-                     "VALUES (:product_id, :sales_channel_id, :id, NOW(), NOW(), NULL) " +
-                     "ON CONFLICT (product_id, sales_channel_id) DO UPDATE SET " +
-                     "updated_at = NOW();";
+                "VALUES (:product_id, :sales_channel_id, :id, NOW(), NOW(), NULL) " +
+                "ON CONFLICT (product_id, sales_channel_id) DO UPDATE SET " +
+                "updated_at = NOW();";
         entityManager.createNativeQuery(sql)
-                     .setParameter("product_id", productSalesChannel.getProduct_id())
-                     .setParameter("sales_channel_id", productSalesChannel.getSales_channel_id())
-                     .setParameter("id", productSalesChannel.getId())
-                     .executeUpdate();
+                .setParameter("product_id", productSalesChannel.getProduct_id())
+                .setParameter("sales_channel_id", productSalesChannel.getSales_channel_id())
+                .setParameter("id", productSalesChannel.getId())
+                .executeUpdate();
     }
 }

@@ -37,11 +37,27 @@ public class MedusaService {
     private final ProductVariantInventoryItemService productVariantInventoryItemService;
     private final ProductVariantService productVariantService;
     private final ProductVariantPriceSetService productVariantPriceSetService;
-
+    private final String[] testBrand = {"Herth+Buss Elparts", "METZGER", "FEBI BILSTEIN", "JP GROUP", "vika", "FAST", "OREX", "TOTAL"};
     @Value("${darma.url}")
     private String apiUrl;
 
-    private final String[] testBrand = {"Herth+Buss Elparts", "METZGER", "FEBI BILSTEIN", "JP GROUP", "vika", "FAST", "OREX", "TOTAL"};
+    private static Item getItem(List<String> values) {
+        Item item = new Item();
+
+        item.setProductCode(values.isEmpty() ? null : values.get(0));
+        item.setManufacturer(values.size() <= 1 ? null : values.get(1));
+        item.setProductName(values.size() <= 2 ? null : values.get(2));
+        item.setMainStock(values.size() <= 3 ? null : values.get(3));
+        item.setOtherBranchStock(values.size() <= 4 ? null : values.get(4));
+        item.setSupplierStock(values.size() <= 5 ? null : values.get(5));
+        item.setPrice(values.size() <= 6 ? null : values.get(6));
+        item.setVatRate(values.size() <= 7 ? null : values.get(7));
+        item.setCurrency(values.size() <= 8 ? null : values.get(8));
+        item.setDeposit(values.size() <= 9 ? null : values.get(9));
+        item.setTecDocId(values.size() <= 10 ? null : values.get(10));
+        item.setTecDocSupplierName(values.size() <= 11 ? null : values.get(11));
+        return item;
+    }
 
     @Async
     public void downloadAndSaveCsvAsItems() throws CsvDownloadException, NoDataException, SavingCsvException, CsvConversionException {
@@ -239,23 +255,5 @@ public class MedusaService {
         values.add(currentField.isEmpty() ? null : currentField.toString()); // add the last field
 
         return getItem(values);
-    }
-
-    private static Item getItem(List<String> values) {
-        Item item = new Item();
-
-        item.setProductCode(values.isEmpty() ? null : values.get(0));
-        item.setManufacturer(values.size() <= 1 ? null : values.get(1));
-        item.setProductName(values.size() <= 2 ? null : values.get(2));
-        item.setMainStock(values.size() <= 3 ? null : values.get(3));
-        item.setOtherBranchStock(values.size() <= 4 ? null : values.get(4));
-        item.setSupplierStock(values.size() <= 5 ? null : values.get(5));
-        item.setPrice(values.size() <= 6 ? null : values.get(6));
-        item.setVatRate(values.size() <= 7 ? null : values.get(7));
-        item.setCurrency(values.size() <= 8 ? null : values.get(8));
-        item.setDeposit(values.size() <= 9 ? null : values.get(9));
-        item.setTecDocId(values.size() <= 10 ? null : values.get(10));
-        item.setTecDocSupplierName(values.size() <= 11 ? null : values.get(11));
-        return item;
     }
 }

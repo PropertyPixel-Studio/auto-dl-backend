@@ -14,11 +14,11 @@ public class ProductVariantInventoryItemService {
     @Transactional
     public void saveWithQuery(ProductVariantInventoryItem productVariantInventoryItem) {
         String sql = "INSERT INTO PRODUCT_VARIANT_INVENTORY_ITEM (variant_id, inventory_item_id, id, required_quantity, created_at, updated_at, deleted_at) " +
-                     "VALUES (:variant_id, :inventory_item_id, :id, 1, NOW(), NOW(), NULL)";
+                "VALUES (:variant_id, :inventory_item_id, :id, 1, NOW(), NOW(), NULL)";
         entityManager.createNativeQuery(sql)
-                     .setParameter("variant_id", productVariantInventoryItem.getVariant_id())
-                     .setParameter("inventory_item_id", productVariantInventoryItem.getInventory_item_id())
-                     .setParameter("id", productVariantInventoryItem.getId())
-                     .executeUpdate();
+                .setParameter("variant_id", productVariantInventoryItem.getVariant_id())
+                .setParameter("inventory_item_id", productVariantInventoryItem.getInventory_item_id())
+                .setParameter("id", productVariantInventoryItem.getId())
+                .executeUpdate();
     }
 }

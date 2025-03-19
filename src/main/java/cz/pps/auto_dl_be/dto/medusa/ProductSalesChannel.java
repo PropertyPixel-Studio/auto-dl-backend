@@ -1,14 +1,15 @@
 package cz.pps.auto_dl_be.dto.medusa;
 
 import cz.pps.auto_dl_be.dto.detail.Article;
+import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.stereotype.Component;
 
 @Getter
 @Setter
 @NoArgsConstructor
+@Data
 public class ProductSalesChannel {
     private String id;
     private String product_id;

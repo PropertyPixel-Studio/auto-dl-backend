@@ -1,6 +1,7 @@
 package cz.pps.auto_dl_be.dto.medusa;
 
 import cz.pps.auto_dl_be.dto.detail.Article;
+import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -8,6 +9,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
+@Data
 public class InventoryItem {
     private String id;
     private String sku;
