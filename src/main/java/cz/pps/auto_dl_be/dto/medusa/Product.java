@@ -8,7 +8,6 @@ import lombok.Setter;
 
 import java.text.Normalizer;
 
-// TODO Add @Component annotation if necessary, remove from others if not
 @Getter
 @Setter
 @NoArgsConstructor
