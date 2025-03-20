@@ -20,5 +20,6 @@ public class ProductVariantPriceSetService {
                 .setParameter("price_set_id", productVariantPriceSet.getPrice_set_id())
                 .setParameter("id", productVariantPriceSet.getId())
                 .executeUpdate();
+        entityManager.flush();
     }
 }

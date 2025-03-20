@@ -30,12 +30,13 @@ public class PriceService {
                 .setParameter("raw_amount", "{\"value\": \"" + price.getAmount() + "\", \"precision\": 2}")
                 .setParameter("amount", price.getAmount())
                 .executeUpdate();
+        entityManager.flush();
     }
 
     @Transactional
     public void updateAmount(Price price) {
         String sql = "UPDATE PRICE SET " +
-                "raw_amount = :raw_amount, " +
+                "raw_amount = CAST(:raw_amount AS jsonB), " +
                 "amount = :amount, " +
                 "updated_at = NOW() " +
                 "WHERE id = :id";
@@ -44,6 +45,7 @@ public class PriceService {
                 .setParameter("amount", price.getAmount())
                 .setParameter("id", price.getId())
                 .executeUpdate();
+        entityManager.flush();
     }
 
     @Transactional
@@ -56,5 +58,6 @@ public class PriceService {
                 .setParameter("title", price.getTitle())
                 .setParameter("id", price.getId())
                 .executeUpdate();
+        entityManager.flush();
     }
 }

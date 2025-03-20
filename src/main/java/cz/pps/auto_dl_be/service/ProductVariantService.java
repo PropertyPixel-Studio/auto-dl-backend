@@ -23,17 +23,25 @@ public class ProductVariantService {
                 .setParameter("ean", productVariant.getEan())
                 .setParameter("product_id", productVariant.getProduct_id())
                 .executeUpdate();
+        entityManager.flush();
     }
 
     @Transactional
     public void updateProductVariant(ProductVariant productVariant) {
         String sql = "UPDATE PRODUCT_VARIANT SET " +
-                "title = '" + productVariant.getTitle() + "', " +
-                "sku = '" + productVariant.getSku() + "', " +
-                "barcode = '" + productVariant.getBarcode() + "', " +
-                "ean = '" + productVariant.getEan() + "', " +
+                "title = :title, " +
+                "sku = :sku, " +
+                "barcode = :barcode, " +
+                "ean = :ean, " +
                 "updated_at = NOW() " +
-                "WHERE id = '" + productVariant.getId() + "'";
-        entityManager.createNativeQuery(sql).executeUpdate();
+                "WHERE id = :id";
+        entityManager.createNativeQuery(sql)
+                .setParameter("title", productVariant.getTitle())
+                .setParameter("sku", productVariant.getSku())
+                .setParameter("barcode", productVariant.getBarcode())
+                .setParameter("ean", productVariant.getEan())
+                .setParameter("id", productVariant.getId())
+                .executeUpdate();
+        entityManager.flush();
     }
 }

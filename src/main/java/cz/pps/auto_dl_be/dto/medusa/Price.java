@@ -27,7 +27,8 @@ public class Price {
         this.amount = amount;
     }
 
-    public Price(String amount) {
+    public Price(String amount, String tecDocId) {
+        this.id = "price_" + tecDocId.replaceAll("[^a-zA-Z0-9-_]", "");
         this.raw_amount = amount;
         this.amount = amount;
     }

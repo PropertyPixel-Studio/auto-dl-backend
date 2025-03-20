@@ -24,12 +24,12 @@ public class ProductService {
     private EntityManager entityManager;
 
     private static String getJSON(Product product) {
-        return "'{" +
+        return "{" +
                 "\"dataSupplierId\": " + product.getSupplierId() +
                 ", \"articleNumber\": \"" + product.getTecDocId() +
                 "\", \"mfrName\": \"" + product.getMfrName() +
                 "\", \"oemNumber\": " + product.getOemNumber() +
-                "}'::jsonb";
+                "}";
     }
 
     private static Product getProduct(Object[] result) {
@@ -48,6 +48,7 @@ public class ProductService {
         return product;
     }
 
+    @Transactional
     public Page<ProductEntity> getAllProducts(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         return productDao.findAll(pageable);
@@ -56,7 +57,7 @@ public class ProductService {
     @Transactional
     public void saveWithQuery(Product product) {
         String sql = "INSERT INTO PRODUCT (id, title, handle, subtitle, description, is_giftcard, status, thumbnail, weight, length, height, width, origin_country, hs_code, mid_code, material, collection_id, type_id, discountable, external_id, created_at, updated_at, metadata) " +
-                "VALUES (:id, :title, :handle, :subtitle, :description, FALSE, 'published', :thumbnail, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, TRUE, :external_id, NOW(), NOW(), :metadata);";
+                "VALUES (:id, :title, :handle, :subtitle, :description, FALSE, 'published', :thumbnail, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, TRUE, :external_id, NOW(), NOW(), CAST(:metadata AS jsonb));";
         entityManager.createNativeQuery(sql)
                 .setParameter("id", product.getId())
                 .setParameter("title", product.getTitle())
@@ -67,6 +68,7 @@ public class ProductService {
                 .setParameter("external_id", product.getExternalId())
                 .setParameter("metadata", getJSON(product))
                 .executeUpdate();
+        entityManager.flush();
     }
 
     @Transactional
@@ -96,7 +98,7 @@ public class ProductService {
                 "description = :description, " +
                 "thumbnail = :thumbnail, " +
                 "external_id = :external_id, " +
-                "metadata = " + getJSON(product) + ", " +
+                "metadata = CAST(:metadata AS jsonb), " +
                 "updated_at = NOW() " +
                 "WHERE id = :id";
         entityManager.createNativeQuery(sql)
@@ -106,10 +108,13 @@ public class ProductService {
                 .setParameter("description", product.getDescription())
                 .setParameter("thumbnail", product.getThumbnail())
                 .setParameter("external_id", product.getExternalId())
+                .setParameter("metadata", getJSON(product))
                 .setParameter("id", product.getId())
                 .executeUpdate();
+        entityManager.flush();
     }
 
+    @Transactional
     public Stream<ProductEntity> getAllProductsAsStream() {
         return productDao.findAllAsStream();
     }

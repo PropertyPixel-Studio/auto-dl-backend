@@ -21,6 +21,7 @@ public class InventoryItemService {
                 .setParameter("title", inventoryItem.getTitle())
                 .setParameter("description", inventoryItem.getDescription())
                 .executeUpdate();
+        entityManager.flush();
     }
 
     @Transactional
@@ -35,5 +36,6 @@ public class InventoryItemService {
                 .setParameter("description", inventoryItem.getDescription())
                 .setParameter("id", inventoryItem.getId())
                 .executeUpdate();
+        entityManager.flush();
     }
 }

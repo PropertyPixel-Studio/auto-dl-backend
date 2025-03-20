@@ -22,5 +22,6 @@ public class ProductSalesChannelService {
                 .setParameter("sales_channel_id", productSalesChannel.getSales_channel_id())
                 .setParameter("id", productSalesChannel.getId())
                 .executeUpdate();
+        entityManager.flush();
     }
 }

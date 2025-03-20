@@ -27,7 +27,8 @@ public class InventoryLevel {
         this.raw_stocked_quantity = this.stocked_quantity;
     }
 
-    public InventoryLevel(String stocked_quantity, String supplierStock, String otherBranchStock) {
+    public InventoryLevel(String stocked_quantity, String supplierStock, String otherBranchStock, String tecDocId) {
+        this.id = "ilev_" + tecDocId.replaceAll("[^a-zA-Z0-9-_]", "");
         this.stocked_quantity = parseQuantity(stocked_quantity, supplierStock, otherBranchStock);
         this.raw_stocked_quantity = this.stocked_quantity;
     }
@@ -36,10 +37,7 @@ public class InventoryLevel {
         if (Objects.equals(stocked_quantity, ">4") || Objects.equals(supplierStock, ">4") || Objects.equals(otherBranchStock, ">4")) {
             return 5;
         }
-        Integer sum = Integer.parseInt(stocked_quantity) + Integer.parseInt(supplierStock) + Integer.parseInt(otherBranchStock);
-        if (sum > 5) {
-            return 5;
-        }
-        return sum;
+        int sum = Integer.parseInt(stocked_quantity) + Integer.parseInt(supplierStock) + Integer.parseInt(otherBranchStock);
+        return Math.min(sum, 5);
     }
 }

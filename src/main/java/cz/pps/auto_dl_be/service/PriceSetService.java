@@ -18,5 +18,6 @@ public class PriceSetService {
         entityManager.createNativeQuery(sql)
                 .setParameter("id", priceSet.getId())
                 .executeUpdate();
+        entityManager.flush();
     }
 }

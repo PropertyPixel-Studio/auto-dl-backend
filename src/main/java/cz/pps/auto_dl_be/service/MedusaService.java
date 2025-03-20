@@ -9,6 +9,7 @@ import cz.pps.auto_dl_be.exception.NoDataException;
 import cz.pps.auto_dl_be.exception.SavingCsvException;
 import cz.pps.auto_dl_be.model.Item;
 import cz.pps.auto_dl_be.model.ProductEntity;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,12 +71,14 @@ public class MedusaService {
     }
 
     @Async
+    @Transactional
     public void updateDataInDatabase() {
         Stream<ProductEntity> dataStream = productService.getAllProductsAsStream();
         dataStream.forEach(product -> {
             List<Article> articles = tecDocService.fetchArticles(product.getTecDocId(), product.getSupplierId()).block();
             if (articles != null && !articles.isEmpty()) {
                 updateArticlesToDatabase(articles.getFirst(), product);
+                logger.info("Updated product: {}", product.getTecDocId());
             }
         });
     }
@@ -224,8 +227,8 @@ public class MedusaService {
     }
 
     private void updateDarmaDataInDatabase(Item item) {
-        InventoryLevel inventoryLevel = new InventoryLevel(item.getMainStock(), item.getSupplierStock(), item.getOtherBranchStock());
-        Price price = new Price(item.getPrice());
+        InventoryLevel inventoryLevel = new InventoryLevel(item.getMainStock(), item.getSupplierStock(), item.getOtherBranchStock(), item.getTecDocId());
+        Price price = new Price(item.getPrice(), item.getTecDocId());
 
         inventoryLevelService.updateStockedQuantity(inventoryLevel);
         priceService.updateAmount(price);

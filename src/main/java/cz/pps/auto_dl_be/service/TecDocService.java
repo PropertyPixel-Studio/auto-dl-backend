@@ -6,6 +6,8 @@ import cz.pps.auto_dl_be.dto.detail.Article;
 import cz.pps.auto_dl_be.dto.detail.Detail;
 import cz.pps.auto_dl_be.dto.detail.GetArticlesResponse;
 import cz.pps.auto_dl_be.dto.detail.SoapBodyDetail;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
@@ -24,6 +26,7 @@ import java.util.Optional;
 public class TecDocService {
     private final WebClient webClient;
     private final XmlMapper xmlMapper;
+    private static final Logger logger = LoggerFactory.getLogger(TecDocService.class);
     @Value("${tecdoc.api.url}")
     private String tecDocUrl;
     @Value("${tecdoc.api.key}")
@@ -55,7 +58,7 @@ public class TecDocService {
                 .map(this::convertToSoapEnvelope) // Convert XML to Java object
                 .map(this::extractBrands) // Extract brands from response
                 .onErrorResume(error -> {
-                    System.err.println("Error occurred: " + error.getMessage());
+                    logger.error("Error occurred: {}", error.getMessage());
                     return Mono.just(List.of()); // Return empty list on failure
                 });
     }

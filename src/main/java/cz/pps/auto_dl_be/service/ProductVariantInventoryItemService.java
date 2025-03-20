@@ -20,5 +20,6 @@ public class ProductVariantInventoryItemService {
                 .setParameter("inventory_item_id", productVariantInventoryItem.getInventory_item_id())
                 .setParameter("id", productVariantInventoryItem.getId())
                 .executeUpdate();
+        entityManager.flush();
     }
 }
