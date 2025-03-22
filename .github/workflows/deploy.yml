@@ -31,6 +31,9 @@ jobs:
       - name: Save Docker image
         run: docker save autodl-backend:${{ github.sha }} -o autodl-backend-${{ github.sha }}.tar
 
+      - name: Change file permissions (for scp)
+        run: chmod 644 autodl-backend-${{ github.sha }}.tar
+
       - name: SSH and Transfer Docker image to Hetzner
         uses: appleboy/scp-action@master
         with:
