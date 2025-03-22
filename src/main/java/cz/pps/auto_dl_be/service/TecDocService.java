@@ -24,9 +24,9 @@ import java.util.Optional;
 
 @Service
 public class TecDocService {
+    private static final Logger logger = LoggerFactory.getLogger(TecDocService.class);
     private final WebClient webClient;
     private final XmlMapper xmlMapper;
-    private static final Logger logger = LoggerFactory.getLogger(TecDocService.class);
     @Value("${tecdoc.api.url}")
     private String tecDocUrl;
     @Value("${tecdoc.api.key}")
