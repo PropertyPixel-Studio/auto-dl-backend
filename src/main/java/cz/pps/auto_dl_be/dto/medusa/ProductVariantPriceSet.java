@@ -1,15 +1,11 @@
-package cz.pps.auto_dl_be.model.medusa;
+package cz.pps.auto_dl_be.dto.medusa;
 
 import cz.pps.auto_dl_be.dto.detail.Article;
-import lombok.Getter;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-import org.springframework.stereotype.Component;
 
-@Component
-@Getter
-@Setter
 @NoArgsConstructor
+@Data
 public class ProductVariantPriceSet {
     private String variant_id;
     private String price_set_id;

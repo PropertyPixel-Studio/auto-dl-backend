@@ -4,10 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.stereotype.Component;
 
-@Component
-//@Table(name = "item", schema = "public")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -23,7 +20,7 @@ public class Item extends AbstractEntity {
     private String vatRate;
     private String currency;
     private String deposit;
-    private String tecDocld;
+    private String tecDocId;
     private String tecDocSupplierName;
     private String tecDocSupplierID = null;
 
@@ -40,7 +37,7 @@ public class Item extends AbstractEntity {
                 "vatRate='" + vatRate + '\'' + "\n" +
                 "currency='" + currency + '\'' + "\n" +
                 "deposit='" + deposit + '\'' + "\n" +
-                "tecDocld='" + tecDocld + '\'' + "\n" +
+                "tecDocld='" + tecDocId + '\'' + "\n" +
                 "tecDocSupplierName='" + tecDocSupplierName + '\'' + "\n" +
                 "tecDocSupplierID='" + tecDocSupplierID + '\'' + "\n" +
                 '}';

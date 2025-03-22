@@ -1,15 +1,11 @@
-package cz.pps.auto_dl_be.model.medusa;
+package cz.pps.auto_dl_be.dto.medusa;
 
 import cz.pps.auto_dl_be.dto.detail.Article;
-import lombok.Getter;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-import org.springframework.stereotype.Component;
 
-@Component
-@Getter
-@Setter
 @NoArgsConstructor
+@Data
 public class Price {
     private String id;
     private String title;
@@ -27,8 +23,16 @@ public class Price {
         this.amount = amount;
     }
 
-    public Price(String amount) {
+    public Price(String amount, String tecDocId) {
+        this.id = "price_" + tecDocId.replaceAll("[^a-zA-Z0-9-_]", "");
         this.raw_amount = amount;
         this.amount = amount;
+    }
+
+    public Price(Article article) {
+        this.id = "price_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
+        this.title = article.getMfrName() + " " + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
+        this.price_set_id = "pset_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
+        this.currency_code = "czk";
     }
 }

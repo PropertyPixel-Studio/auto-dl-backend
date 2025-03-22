@@ -2,12 +2,14 @@ package cz.pps.auto_dl_be.service;
 
 import cz.pps.auto_dl_be.dto.brands.Brand;
 import cz.pps.auto_dl_be.dto.detail.Article;
+import cz.pps.auto_dl_be.dto.medusa.*;
 import cz.pps.auto_dl_be.exception.CsvConversionException;
 import cz.pps.auto_dl_be.exception.CsvDownloadException;
 import cz.pps.auto_dl_be.exception.NoDataException;
 import cz.pps.auto_dl_be.exception.SavingCsvException;
 import cz.pps.auto_dl_be.model.Item;
-import cz.pps.auto_dl_be.model.medusa.*;
+import cz.pps.auto_dl_be.model.ProductEntity;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,12 +21,13 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
-public class CsvService {
+public class MedusaService {
 
-    private static final Logger logger = LoggerFactory.getLogger(CsvService.class);
+    private static final Logger logger = LoggerFactory.getLogger(MedusaService.class);
     private final TecDocService tecDocService;
     private final InventoryItemService inventoryItemService;
     private final InventoryLevelService inventoryLevelService;
@@ -35,11 +38,27 @@ public class CsvService {
     private final ProductVariantInventoryItemService productVariantInventoryItemService;
     private final ProductVariantService productVariantService;
     private final ProductVariantPriceSetService productVariantPriceSetService;
-
+    private final String[] testBrand = {"Herth+Buss Elparts", "METZGER", "FEBI BILSTEIN", "JP GROUP", "vika", "FAST", "OREX", "TOTAL"};
     @Value("${darma.url}")
     private String apiUrl;
 
-    private final String[] testBrand = {"Herth+Buss Elparts", "METZGER", "FEBI BILSTEIN", "JP GROUP", "vika", "FAST", "OREX", "TOTAL"};
+    private static Item getItem(List<String> values) {
+        Item item = new Item();
+
+        item.setProductCode(values.isEmpty() ? null : values.get(0));
+        item.setManufacturer(values.size() <= 1 ? null : values.get(1));
+        item.setProductName(values.size() <= 2 ? null : values.get(2));
+        item.setMainStock(values.size() <= 3 ? null : values.get(3));
+        item.setOtherBranchStock(values.size() <= 4 ? null : values.get(4));
+        item.setSupplierStock(values.size() <= 5 ? null : values.get(5));
+        item.setPrice(values.size() <= 6 ? null : values.get(6));
+        item.setVatRate(values.size() <= 7 ? null : values.get(7));
+        item.setCurrency(values.size() <= 8 ? null : values.get(8));
+        item.setDeposit(values.size() <= 9 ? null : values.get(9));
+        item.setTecDocId(values.size() <= 10 ? null : values.get(10));
+        item.setTecDocSupplierName(values.size() <= 11 ? null : values.get(11));
+        return item;
+    }
 
     @Async
     public void downloadAndSaveCsvAsItems() throws CsvDownloadException, NoDataException, SavingCsvException, CsvConversionException {
@@ -49,6 +68,19 @@ public class CsvService {
         logger.info("Fetched brands from TecDoc API");
         convertToItemsAndSave(csvFile, brands);
         deleteCsvFile(csvFile);
+    }
+
+    @Async
+    @Transactional
+    public void updateDataInDatabase() {
+        Stream<ProductEntity> dataStream = productService.getAllProductsAsStream();
+        dataStream.forEach(product -> {
+            List<Article> articles = tecDocService.fetchArticles(product.getTecDocId(), product.getSupplierId()).block();
+            if (articles != null && !articles.isEmpty()) {
+                updateArticlesToDatabase(articles.getFirst(), product);
+                logger.info("Updated product: {}", product.getTecDocId());
+            }
+        });
     }
 
     private File getCsvFile(String apiUrl) throws CsvDownloadException, NoDataException, SavingCsvException {
@@ -123,7 +155,7 @@ public class CsvService {
         return item.getManufacturer() != null &&
                 Arrays.stream(testBrand).anyMatch(item.getManufacturer()::contains) &&
                 item.getTecDocSupplierName() != null &&
-                item.getTecDocld() != null &&
+                item.getTecDocId() != null &&
                 (!Objects.equals(item.getMainStock(), "0") ||
                         !Objects.equals(item.getSupplierStock(), "0") ||
                         !Objects.equals(item.getOtherBranchStock(), "0"));
@@ -137,12 +169,12 @@ public class CsvService {
     }
 
     private void processItem(Item item) {
-        String id = item.getTecDocld().replaceAll("[^a-zA-Z0-9-_]", "");
+        String id = item.getTecDocId().replaceAll("[^a-zA-Z0-9-_]", "");
 
         Product existingProduct = productService.findById(id);
         if (existingProduct == null) {
             logger.info("Saving new product: {}", id);
-            List<Article> articles = tecDocService.fetchArticles(item.getTecDocld(), item.getTecDocSupplierID()).block();
+            List<Article> articles = tecDocService.fetchArticles(item.getTecDocId(), item.getTecDocSupplierID()).block();
             if (articles != null && !articles.isEmpty()) {
                 saveArticlesToDatabase(articles.getFirst(), item);
             }
@@ -174,13 +206,29 @@ public class CsvService {
             productVariantService.saveWithQuery(productVariant);
             productVariantPriceSetService.saveWithQuery(productVariantPriceSet);
         } catch (Exception e) {
-            logger.info("Error occurred while saving product: {}, error: {}", item.getTecDocld(), e.getMessage());
+            logger.info("Error occurred while saving product: {}, error: {}", item.getTecDocId(), e.getMessage());
+        }
+    }
+
+    private void updateArticlesToDatabase(Article article, ProductEntity productEntity) {
+        try {
+            InventoryItem inventoryItem = new InventoryItem(article);
+            Price price = new Price(article);
+            Product product = new Product(article, productEntity.getSupplierId());
+            ProductVariant productVariant = new ProductVariant(article);
+
+            productService.updateProduct(product);
+            inventoryItemService.updateInventoryItem(inventoryItem);
+            priceService.updatePrice(price);
+            productVariantService.updateProductVariant(productVariant);
+        } catch (Exception e) {
+            logger.info("Error occurred while updating product: {}, error: {}", productEntity.getTecDocId(), e.getMessage());
         }
     }
 
     private void updateDarmaDataInDatabase(Item item) {
-        InventoryLevel inventoryLevel = new InventoryLevel(item.getMainStock(), item.getSupplierStock(), item.getOtherBranchStock());
-        Price price = new Price(item.getPrice());
+        InventoryLevel inventoryLevel = new InventoryLevel(item.getMainStock(), item.getSupplierStock(), item.getOtherBranchStock(), item.getTecDocId());
+        Price price = new Price(item.getPrice(), item.getTecDocId());
 
         inventoryLevelService.updateStockedQuantity(inventoryLevel);
         priceService.updateAmount(price);
@@ -210,23 +258,5 @@ public class CsvService {
         values.add(currentField.isEmpty() ? null : currentField.toString()); // add the last field
 
         return getItem(values);
-    }
-
-    private static Item getItem(List<String> values) {
-        Item item = new Item();
-
-        item.setProductCode(values.isEmpty() ? null : values.get(0));
-        item.setManufacturer(values.size() <= 1 ? null : values.get(1));
-        item.setProductName(values.size() <= 2 ? null : values.get(2));
-        item.setMainStock(values.size() <= 3 ? null : values.get(3));
-        item.setOtherBranchStock(values.size() <= 4 ? null : values.get(4));
-        item.setSupplierStock(values.size() <= 5 ? null : values.get(5));
-        item.setPrice(values.size() <= 6 ? null : values.get(6));
-        item.setVatRate(values.size() <= 7 ? null : values.get(7));
-        item.setCurrency(values.size() <= 8 ? null : values.get(8));
-        item.setDeposit(values.size() <= 9 ? null : values.get(9));
-        item.setTecDocld(values.size() <= 10 ? null : values.get(10));
-        item.setTecDocSupplierName(values.size() <= 11 ? null : values.get(11));
-        return item;
     }
 }

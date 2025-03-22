@@ -1,6 +1,6 @@
 package cz.pps.auto_dl_be.service;
 
-import cz.pps.auto_dl_be.model.medusa.PriceSet;
+import cz.pps.auto_dl_be.dto.medusa.PriceSet;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
@@ -14,7 +14,10 @@ public class PriceSetService {
     @Transactional
     public void saveWithQuery(PriceSet priceSet) {
         String sql = "INSERT INTO PRICE_SET (id, created_at, updated_at, deleted_at) " +
-                "VALUES ('" + priceSet.getId() + "', NOW(), NOW(), NULL);";
-        entityManager.createNativeQuery(sql).executeUpdate();
+                "VALUES (:id, NOW(), NOW(), NULL)";
+        entityManager.createNativeQuery(sql)
+                .setParameter("id", priceSet.getId())
+                .executeUpdate();
+        entityManager.flush();
     }
 }

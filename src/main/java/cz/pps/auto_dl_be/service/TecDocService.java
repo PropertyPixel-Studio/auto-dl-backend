@@ -6,9 +6,12 @@ import cz.pps.auto_dl_be.dto.detail.Article;
 import cz.pps.auto_dl_be.dto.detail.Detail;
 import cz.pps.auto_dl_be.dto.detail.GetArticlesResponse;
 import cz.pps.auto_dl_be.dto.detail.SoapBodyDetail;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.http.*;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -21,12 +24,13 @@ import java.util.Optional;
 
 @Service
 public class TecDocService {
+    private static final Logger logger = LoggerFactory.getLogger(TecDocService.class);
+    private final WebClient webClient;
+    private final XmlMapper xmlMapper;
     @Value("${tecdoc.api.url}")
     private String tecDocUrl;
     @Value("${tecdoc.api.key}")
     private String tecDocKey;
-    private final WebClient webClient;
-    private final XmlMapper xmlMapper;
 
     public TecDocService(WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder.baseUrl(tecDocUrl).build();
@@ -54,7 +58,7 @@ public class TecDocService {
                 .map(this::convertToSoapEnvelope) // Convert XML to Java object
                 .map(this::extractBrands) // Extract brands from response
                 .onErrorResume(error -> {
-                    System.err.println("Error occurred: " + error.getMessage());
+                    logger.error("Error occurred: {}", error.getMessage());
                     return Mono.just(List.of()); // Return empty list on failure
                 });
     }
