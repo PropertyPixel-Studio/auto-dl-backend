@@ -1,31 +1,59 @@
-name: Deploy to Server
+name: Deploy to Hetzner (Without Registry)
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out the repository
-        uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Set up SSH for server access
-        uses: webfactory/ssh-agent@v0.5.3
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
         with:
-          ssh-private-key: ${{ secrets.SSH_DEPLOY_KEY }}
+          java-version: '21'
+          distribution: 'adopt'
 
-      - name: Copy files to the server
-        run: |
-          scp -o StrictHostKeyChecking=no -r . deployuser@65.21.94.175:/home/deployuser/PPSProjects/AUTODL
+      - name: Grant execute permission for mvnw
+        run: chmod +x ./mvnw
 
-      - name: SSH into the server and deploy
-        run: |
-          ssh deployuser@65.21.94.175 << 'EOF'
-          cd /home/deployuser/PPSProjects/AUTODL
-          docker-compose down
-          docker-compose up -d --build
-          EOF
+      - name: Build with Maven
+        run: ./mvnw clean package -DskipTests
+        if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/heads/') }}
+
+      - name: Build Docker image
+        run: docker build -t your-app:${{ github.sha }} .
+
+      - name: Save Docker image
+        run: docker save your-app:${{ github.sha }} -o your-app-${{ github.sha }}.tar
+
+      - name: SSH and Transfer Docker image to Hetzner
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USERNAME }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          port: ${{ secrets.HETZNER_PORT }}
+          source: your-app-${{ github.sha }}.tar
+          target: /tmp/
+
+      - name: SSH to Hetzner server and deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USERNAME }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          port: ${{ secrets.HETZNER_PORT }}
+          script: |
+            echo "Přihlášeno na server."
+            echo "Načítání Docker image..."
+            docker load -i /tmp/your-app-${{ github.sha }}.tar
+            echo "Zastavení a odstranění starých kontejnerů..."
+            docker-compose -f docker-compose.yml down
+            echo "Spuštění nových kontejnerů..."
+            docker-compose -f docker-compose.yml up -d
+            echo "Deployment dokončen."

@@ -1,6 +1,6 @@
 services:
   app:
-    build: .
+    image: your-app:${{ github.sha }} # Použijte stejný tag, jaký byl vytvořen v GitHub Actions
     ports:
       - "50021:50021"
     restart: always
