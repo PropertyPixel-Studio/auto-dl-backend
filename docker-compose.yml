@@ -1,6 +1,6 @@
 services:
   app:
-    image: your-app:${{ github.sha }} # Použijte stejný tag, jaký byl vytvořen v GitHub Actions
+    image: autodl-backend:${{ github.sha }}
     ports:
       - "50021:50021"
     restart: always

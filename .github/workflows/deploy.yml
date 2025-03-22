@@ -26,10 +26,10 @@ jobs:
         if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/heads/') }}
 
       - name: Build Docker image
-        run: docker build -t your-app:${{ github.sha }} .
+        run: docker build -t autodl-backend:${{ github.sha }} .
 
       - name: Save Docker image
-        run: docker save your-app:${{ github.sha }} -o your-app-${{ github.sha }}.tar
+        run: docker save autodl-backend:${{ github.sha }} -o autodl-backend-${{ github.sha }}.tar
 
       - name: SSH and Transfer Docker image to Hetzner
         uses: appleboy/scp-action@master
@@ -38,7 +38,7 @@ jobs:
           username: ${{ secrets.HETZNER_USERNAME }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
           port: ${{ secrets.HETZNER_PORT }}
-          source: your-app-${{ github.sha }}.tar
+          source: autodl-backend-${{ github.sha }}.tar
           target: /tmp/
 
       - name: SSH to Hetzner server and deploy
@@ -51,7 +51,7 @@ jobs:
           script: |
             echo "Přihlášeno na server."
             echo "Načítání Docker image..."
-            docker load -i /tmp/your-app-${{ github.sha }}.tar
+            docker load -i /tmp/autodl-backend-${{ github.sha }}.tar
             echo "Zastavení a odstranění starých kontejnerů..."
             docker-compose -f docker-compose.yml down
             echo "Spuštění nových kontejnerů..."
