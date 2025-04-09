@@ -46,4 +46,10 @@ The selected pull request will be deployed to the production environment, tempor
 
 **Note**: When a new commit is pushed to the main branch, it will automatically override any manual PR deployment and restore the main branch to production.
 
+### Network Configuration
+
+The application is deployed using Docker Compose and connects to an external Docker network named `autodl-network`. This allows the application to communicate with other services on the same network.
+
+The network is automatically created during deployment if it doesn't already exist.
+
 Deployment triggered on: $(date)
