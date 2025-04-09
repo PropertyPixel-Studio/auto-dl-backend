@@ -5,7 +5,6 @@ on:
     branches: [ main ]
     paths-ignore:
       - 'README.md'
-      - '.github/workflows/manual-deploy.yml'
 
 jobs:
   build-and-deploy:
@@ -32,8 +31,8 @@ jobs:
           # Create a zip file of the repository and build artifacts
           zip -r deploy.zip . -x "*.git*" "*target/classes*" "*target/generated-sources*" "*target/maven-*" "*target/test-*"
 
-      - name: Set branch name
-        id: branch_name
+      # We're only deploying from main branch
+      - name: Set environment variables
         run: echo "BRANCH_NAME=main" >> $GITHUB_ENV
 
       - name: Set up SSH
@@ -77,20 +76,33 @@ jobs:
           fi
 
           # Create application directories with sudo
-          sudo mkdir -p /home/$USER/autodl/auto-dl-backend
-          sudo chown -R $USER:$USER /home/$USER/autodl
+          # Get the actual username
+          ACTUAL_USER=$(whoami)
+          echo "Current user: $ACTUAL_USER"
+
+          # Create directories
+          sudo mkdir -p /home/$ACTUAL_USER/autodl/auto-dl-backend
+          sudo chown -R $ACTUAL_USER:$ACTUAL_USER /home/$ACTUAL_USER/autodl
+          echo "Created directories with proper ownership"
 
           # Backup application.properties file if it exists
-          if [ -f /home/$USER/autodl/auto-dl-backend/src/main/resources/application.properties ]; then
-            cp /home/$USER/autodl/auto-dl-backend/src/main/resources/application.properties /tmp/application.properties.backup
+          if [ -f /home/$ACTUAL_USER/autodl/auto-dl-backend/src/main/resources/application.properties ]; then
+            cp /home/$ACTUAL_USER/autodl/auto-dl-backend/src/main/resources/application.properties /tmp/application.properties.backup
             echo "Backed up existing application.properties file"
           fi
           EOF
 
-      - name: Copy deployment package
+      - name: Prepare and copy deployment package
         run: |
+          # Create a temporary directory on the server for the deployment package
+          ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "mkdir -p ~/deployment-temp"
+
           # Copy the zip file to the server
-          scp deploy.zip ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }}:/home/${{ secrets.AZURE_USER }}/
+          echo "Copying deployment package to server..."
+          scp -v deploy.zip ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }}:~/deployment-temp/
+
+          # Verify the file was copied successfully
+          ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "ls -la ~/deployment-temp/"
 
       - name: Deploy application
         env:
@@ -102,33 +114,39 @@ jobs:
         run: |
           # Deploy the application
           ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "bash -s" << EOF
+          # Get the actual username
+          ACTUAL_USER=$(whoami)
+          echo "Current user: $ACTUAL_USER"
+
           # Use the actual home directory of the user
-          AZURE_HOME="/home/\$USER"
-          echo "Home directory: \$AZURE_HOME"
-          cd \$AZURE_HOME
-          echo "Current directory: \$(pwd)"
+          AZURE_HOME="/home/$ACTUAL_USER"
+          echo "Home directory: $AZURE_HOME"
+
+          # Check the deployment temp directory
+          cd ~/deployment-temp
+          echo "Current directory: $(pwd)"
 
           # Verify the zip file exists
           if [ ! -f deploy.zip ]; then
-            echo "Error: deploy.zip not found in \$(pwd)!"
+            echo "Error: deploy.zip not found in $(pwd)!"
             ls -la
             exit 1
           fi
 
           # Clean the target directory while preserving application.properties
           echo "Cleaning target directory..."
-          find \$AZURE_HOME/autodl/auto-dl-backend -mindepth 1 -not -name 'application.properties' -delete || true
+          find $AZURE_HOME/autodl/auto-dl-backend -mindepth 1 -not -name 'application.properties' -delete || true
 
           # Extract the deployment package
           echo "Extracting deployment package..."
-          unzip -o deploy.zip -d \$AZURE_HOME/autodl/auto-dl-backend
+          unzip -o deploy.zip -d $AZURE_HOME/autodl/auto-dl-backend
           rm deploy.zip
 
           # Restore application.properties file if it was backed up
           if [ -f /tmp/application.properties.backup ]; then
             echo "Restoring application.properties from backup..."
-            mkdir -p \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/
-            cp /tmp/application.properties.backup \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            mkdir -p $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/
+            cp /tmp/application.properties.backup $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
             rm /tmp/application.properties.backup
           else
             # Create application.properties file from GitHub secrets
@@ -139,28 +157,28 @@ jobs:
             DB_PASSWORD=\$(echo "${DATABASE_URL}" | sed -E 's|postgres://[^:]+:([^@]+)@.+$|\1|')
 
             # Create directory for application.properties if it doesn't exist
-            mkdir -p \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/
+            mkdir -p $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/
 
             # Create application.properties file
-            echo "spring.application.name=auto-dl-be" > \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "" >> \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "# Postgres DB" >> \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "spring.datasource.url=\${DB_URL}" >> \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "spring.datasource.username=\${DB_USERNAME}" >> \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "spring.datasource.password=\${DB_PASSWORD}" >> \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect" >> \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "spring.jpa.hibernate.ddl-auto=update" >> \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "" >> \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "#Others" >> \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "server.port=${SERVER_PORT}" >> \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "darma.url=${DARMA_URL}" >> \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "tecdoc.api.url=https://webservice.tecalliance.services/pegasus-3-0/services/TecdocToCatDLB.soapEndpoint" >> \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "tecdoc.api.key=${TECDOC_API_KEY}" >> \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "filter.apikey=BTtW4BWlUrDkbloYTQrIsvNcaTNoOGc7y2Wb2TpjIV8=" >> \$AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "spring.application.name=auto-dl-be" > $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "" >> $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "# Postgres DB" >> $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "spring.datasource.url=${DB_URL}" >> $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "spring.datasource.username=${DB_USERNAME}" >> $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "spring.datasource.password=${DB_PASSWORD}" >> $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect" >> $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "spring.jpa.hibernate.ddl-auto=update" >> $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "" >> $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "#Others" >> $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "server.port=${SERVER_PORT}" >> $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "darma.url=${DARMA_URL}" >> $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "tecdoc.api.url=https://webservice.tecalliance.services/pegasus-3-0/services/TecdocToCatDLB.soapEndpoint" >> $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "tecdoc.api.key=${TECDOC_API_KEY}" >> $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "filter.apikey=BTtW4BWlUrDkbloYTQrIsvNcaTNoOGc7y2Wb2TpjIV8=" >> $AZURE_HOME/autodl/auto-dl-backend/src/main/resources/application.properties
           fi
 
           # Build and start the application
-          cd \$AZURE_HOME/autodl/auto-dl-backend
+          cd $AZURE_HOME/autodl/auto-dl-backend
           echo "Building and starting the application..."
           echo "Current directory: \$(pwd)"
           ls -la
