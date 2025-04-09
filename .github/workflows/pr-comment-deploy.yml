@@ -1,0 +1,129 @@
+name: PR Comment Deploy
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  deploy-command:
+    if: ${{ github.event.issue.pull_request && contains(github.event.comment.body, '/deploy') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if comment is from a collaborator
+        id: check_collaborator
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              // First, check if the user is a collaborator
+              try {
+                const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  username: context.payload.comment.user.login
+                });
+
+                const isCollaborator = ['admin', 'write'].includes(permission.permission);
+                if (!isCollaborator) {
+                  await github.rest.issues.createComment({
+                    issue_number: context.issue.number,
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    body: '⚠️ Only repository collaborators can trigger deployments.'
+                  });
+                  return false;
+                }
+              } catch (error) {
+                // If we can't check permissions, fall back to checking if the user is the PR author
+                console.log('Unable to check collaborator status: ' + error.message);
+                console.log('Falling back to checking if user is PR author');
+
+                // Get the PR details
+                const { data: pr } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.issue.number
+                });
+
+                // Check if the comment author is the PR author
+                const isPRAuthor = pr.user.login === context.payload.comment.user.login;
+                if (!isPRAuthor) {
+                  await github.rest.issues.createComment({
+                    issue_number: context.issue.number,
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    body: '⚠️ Only the PR author or repository collaborators can trigger deployments.'
+                  });
+                  return false;
+                }
+              }
+
+              return true;
+            } catch (error) {
+              console.error('Error checking permissions: ' + error.message);
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '❌ Error checking permissions: ' + error.message + '\n\nPlease try using the manual method from the Actions tab instead.'
+              });
+              return false;
+            }
+
+      - name: React to comment
+        if: steps.check_collaborator.outputs.result == 'true'
+        continue-on-error: true  # Don't fail the workflow if this step fails
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.rest.reactions.createForIssueComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: context.payload.comment.id,
+                content: 'rocket'
+              });
+            } catch (error) {
+              console.log('Unable to add reaction, but continuing workflow: ' + error.message);
+            }
+
+      - name: Trigger deployment workflow
+        if: steps.check_collaborator.outputs.result == 'true'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              // Trigger the deployment workflow
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'manual-deploy.yml',  // This should match the filename of your deployment workflow
+                ref: 'main',
+                inputs: {
+                  pr_number: context.issue.number.toString()
+                }
+              });
+
+              // Add a comment to the PR
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '🚀 Deployment triggered! The workflow is now running...\n\nYou can check the progress in the [Actions tab](https://github.com/${{ github.repository }}/actions/workflows/manual-deploy.yml).'
+              });
+            } catch (error) {
+              console.error('Error triggering deployment: ' + error.message);
+
+              // Notify about the error
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '❌ Error triggering deployment: ' + error.message + '\n\nPlease try using the manual method from the Actions tab instead.'
+              });
+
+              throw error; // Re-throw to fail the workflow
+            }

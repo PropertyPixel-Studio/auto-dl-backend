@@ -17,9 +17,23 @@ This is the default deployment method and ensures that the main branch is always
 
 ### Manual PR Deployment
 
-You can manually deploy any pull request to the production environment using the GitHub Actions workflow. This is useful for testing changes in the production environment before merging them to the main branch.
+You can manually deploy any pull request to the production environment. This is useful for testing changes in the production environment before merging them to the main branch.
 
-To manually deploy a pull request:
+#### Option 1: Deploy directly from the PR
+
+Simply add a comment to the PR with the command:
+
+```
+/deploy
+```
+
+This will trigger the deployment workflow automatically. The workflow will add a comment to the PR with a link to the running workflow.
+
+**Note**: Only repository collaborators or the PR author can trigger deployments using this method.
+
+#### Option 2: Deploy from the Actions tab
+
+Alternatively, you can trigger the deployment from the Actions tab:
 
 1. Go to the GitHub repository
 2. Click on the "Actions" tab
