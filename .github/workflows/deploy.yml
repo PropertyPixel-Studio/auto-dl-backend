@@ -49,6 +49,10 @@ jobs:
           # Install Docker and Docker Compose if needed
           ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "bash -s" << EOF
           export BRANCH_NAME="${BRANCH_NAME}"
+
+          # Check disk space before cleanup
+          echo "Disk space before cleanup:"
+          df -h
           # Install unzip if not already installed
           if ! command -v unzip &> /dev/null; then
             echo "Installing unzip..."
@@ -74,6 +78,21 @@ jobs:
             sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
           fi
+
+          # Clean up Docker resources to free disk space
+          echo "\n=== Cleaning up Docker resources ==="
+          echo "Removing unused containers, networks, and volumes..."
+          sudo docker system prune -f
+
+          echo "Removing unused images..."
+          sudo docker image prune -a -f
+
+          echo "Removing dangling volumes..."
+          sudo docker volume prune -f
+
+          # Check disk space after cleanup
+          echo "\nDisk space after cleanup:"
+          df -h
 
           # Create application directories
           echo "Creating application directories..."
@@ -192,9 +211,16 @@ jobs:
           # Stop and remove any existing containers
           sudo docker-compose -f docker-compose.yml down || true
 
-          # Build and start the application
-          sudo docker-compose -f docker-compose.yml build
+          # Build and start the application with build arguments to optimize the build
+          sudo docker-compose -f docker-compose.yml build --no-cache --pull
           sudo docker-compose -f docker-compose.yml up -d
+
+          # Clean up build cache after successful deployment
+          sudo docker builder prune -f
+
+          # Check disk space after deployment
+          echo "\nDisk space after deployment:"
+          df -h
 
           echo "Deployment completed successfully!"
           EOF

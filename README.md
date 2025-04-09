@@ -18,10 +18,24 @@ The deployment process:
 5. Configures the application with the necessary environment variables
 6. Starts the application using Docker Compose
 
-### Network Configuration
+### Docker Configuration
 
-The application is deployed using Docker Compose and connects to an external Docker network named `autodl-network`. This allows the application to communicate with other services on the same network.
+The application is deployed using Docker Compose with the following optimizations:
+
+#### Space Efficiency
+- Uses Alpine-based images which are much smaller
+- Multi-stage build that only copies necessary files to the production image
+- Automatic cleanup of unused Docker resources during deployment
+- Resource limits to prevent container from using excessive memory
+- Log rotation to prevent log files from growing too large
+
+#### Network Configuration
+The application connects to an external Docker network named `autodl-network`. This allows the application to communicate with other services on the same network.
 
 The network is automatically created during deployment if it doesn't already exist.
+
+#### Security
+- Runs as a non-root user inside the container
+- Uses healthchecks to ensure the application is running correctly
 
 Deployment triggered on: $(date)
