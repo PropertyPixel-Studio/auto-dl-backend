@@ -16,9 +16,9 @@ import java.io.IOException;
 public class ApiKeyFilter extends GenericFilterBean {
 
     private static final String API_KEY_HEADER = "API-KEY";
-    private static String VALID_API_KEY;
+    private static String VALID_API_KEY = "your-api-key-value";
 
-    @Value("${filter.apikey}")
+    @Value("${filter.apikey:your-api-key-value}")
     public void setValidApiKey(String apiKey) {
         VALID_API_KEY = apiKey;
     }

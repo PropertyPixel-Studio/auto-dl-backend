@@ -1,6 +1,8 @@
 services:
   app:
-    image: autodl-backend:${{ github.sha }}
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "50021:50021"
     restart: always

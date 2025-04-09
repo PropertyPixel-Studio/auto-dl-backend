@@ -1,19 +1,22 @@
-name: Deploy to Azure
+name: Deploy PR to Azure
 
 on:
-  push:
-    branches: [ main ]
-    paths-ignore:
-      - 'README.md'
-      - '.github/workflows/manual-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to deploy (will replace main deployment)'
+        required: true
+        type: string
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout PR
         uses: actions/checkout@v3
+        with:
+          ref: refs/pull/${{ github.event.inputs.pr_number }}/head
 
       - name: Set up JDK 21
         uses: actions/setup-java@v3
@@ -32,9 +35,23 @@ jobs:
           # Create a zip file of the repository and build artifacts
           zip -r deploy.zip . -x "*.git*" "*target/classes*" "*target/generated-sources*" "*target/maven-*" "*target/test-*"
 
-      - name: Set branch name
-        id: branch_name
-        run: echo "BRANCH_NAME=main" >> $GITHUB_ENV
+      - name: Get PR info
+        id: pr_info
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: ${{ github.event.inputs.pr_number }}
+            });
+
+            const branchName = pr.head.ref.replace(/\//g, '-');
+            core.exportVariable('BRANCH_NAME', branchName);
+            core.exportVariable('PR_TITLE', pr.title);
+
+            return { branchName, title: pr.title };
 
       - name: Set up SSH
         run: |
@@ -99,6 +116,8 @@ jobs:
           TECDOC_API_KEY: ${{ secrets.TECDOC_API_KEY }}
           DARMA_URL: ${{ secrets.DARMA_URL }}
           BRANCH_NAME: ${{ env.BRANCH_NAME }}
+          PR_NUMBER: ${{ github.event.inputs.pr_number }}
+          PR_TITLE: ${{ env.PR_TITLE }}
         run: |
           # Deploy the application
           ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "bash -s" << EOF
@@ -123,6 +142,9 @@ jobs:
           echo "Extracting deployment package..."
           unzip -o deploy.zip -d \$AZURE_HOME/autodl/auto-dl-backend
           rm deploy.zip
+
+          # Store the deployed PR info for tracking
+          echo "PR #${PR_NUMBER}: ${PR_TITLE} (Branch: ${BRANCH_NAME})" > \$AZURE_HOME/autodl/auto-dl-backend/.deployed-pr
 
           # Restore application.properties file if it was backed up
           if [ -f /tmp/application.properties.backup ]; then
@@ -178,5 +200,26 @@ jobs:
           sudo docker-compose -f docker-compose.yml build
           sudo docker-compose -f docker-compose.yml up -d
 
-          echo "Deployment completed successfully!"
+          echo "Deployment of PR #${PR_NUMBER} (${PR_TITLE}) completed successfully!"
           EOF
+
+      - name: Comment on PR
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const serverIp = '${{ secrets.AZURE_SERVER_IP }}';
+            const port = '${{ secrets.SERVER_PORT }}';
+            const prNumber = '${{ github.event.inputs.pr_number }}';
+
+            github.rest.issues.createComment({
+              issue_number: prNumber,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 **PR Deployed to Production Environment**\n\n` +
+                    `This PR has been deployed to the production environment and is now live at: http://${serverIp}:${port}/\n\n` +
+                    `This deployment will remain active until:\n` +
+                    `- Another PR is manually deployed, or\n` +
+                    `- A new commit is pushed to the main branch\n\n` +
+                    `To revert to the main branch deployment, you can run the workflow again but select the main branch.`
+            });
