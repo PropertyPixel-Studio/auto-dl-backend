@@ -7,8 +7,18 @@ import cz.pps.auto_dl_be.exception.CsvConversionException;
 import cz.pps.auto_dl_be.exception.CsvDownloadException;
 import cz.pps.auto_dl_be.exception.NoDataException;
 import cz.pps.auto_dl_be.exception.SavingCsvException;
+import cz.pps.auto_dl_be.dto.brands.Brand;
+import cz.pps.auto_dl_be.dto.detail.Article;
+import cz.pps.auto_dl_be.dto.medusa.*;
+import cz.pps.auto_dl_be.exception.CsvConversionException;
+import cz.pps.auto_dl_be.exception.CsvDownloadException;
+import cz.pps.auto_dl_be.exception.NoDataException;
+import cz.pps.auto_dl_be.exception.SavingCsvException;
 import cz.pps.auto_dl_be.model.Item;
 import cz.pps.auto_dl_be.model.ProductEntity;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -24,7 +34,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
-@RequiredArgsConstructor
 public class MedusaService {
 
     private static final Logger logger = LoggerFactory.getLogger(MedusaService.class);
@@ -38,8 +47,43 @@ public class MedusaService {
     private final ProductVariantInventoryItemService productVariantInventoryItemService;
     private final ProductVariantService productVariantService;
     private final ProductVariantPriceSetService productVariantPriceSetService;
+    private final MeterRegistry meterRegistry;
+    private final Timer fetchParseTimer;
+    private final Counter productsProcessedCounter;
+    private final Counter productsCreatedCounter;
+    private final Counter productsUpdatedCounter;
+
     @Value("${darma.url}")
     private String apiUrl;
+
+    public MedusaService(TecDocService tecDocService, InventoryItemService inventoryItemService, InventoryLevelService inventoryLevelService, PriceService priceService, PriceSetService priceSetService, ProductSalesChannelService productSalesChannelService, ProductService productService, ProductVariantInventoryItemService productVariantInventoryItemService, ProductVariantService productVariantService, ProductVariantPriceSetService productVariantPriceSetService, MeterRegistry meterRegistry) {
+        this.tecDocService = tecDocService;
+        this.inventoryItemService = inventoryItemService;
+        this.inventoryLevelService = inventoryLevelService;
+        this.priceService = priceService;
+        this.priceSetService = priceSetService;
+        this.productSalesChannelService = productSalesChannelService;
+        this.productService = productService;
+        this.productVariantInventoryItemService = productVariantInventoryItemService;
+        this.productVariantService = productVariantService;
+        this.productVariantPriceSetService = productVariantPriceSetService;
+        this.meterRegistry = meterRegistry;
+
+        // Initialize metrics
+        this.fetchParseTimer = Timer.builder("autodl.fetch.parse.duration")
+                .description("Time taken to fetch CSV, parse, and save/update products")
+                .register(meterRegistry);
+        this.productsProcessedCounter = Counter.builder("autodl.products.processed.total")
+                .description("Total number of products processed from CSV")
+                .register(meterRegistry);
+        this.productsCreatedCounter = Counter.builder("autodl.products.created.total")
+                .description("Total number of new products created")
+                .register(meterRegistry);
+        this.productsUpdatedCounter = Counter.builder("autodl.products.updated.total")
+                .description("Total number of existing products updated")
+                .register(meterRegistry);
+    }
+
 
     private static Item getItem(List<String> values) {
         Item item = new Item();
@@ -61,12 +105,27 @@ public class MedusaService {
 
     @Async
     public void downloadAndSaveCsvAsItems() throws CsvDownloadException, NoDataException, SavingCsvException, CsvConversionException {
-        logger.info("Downloading CSV data from Darma");
-        File csvFile = getCsvFile(apiUrl);
-        List<Brand> brands = fetchBrands();
-        logger.info("Fetched brands from TecDoc API");
-        convertToItemsAndSave(csvFile, brands);
-        deleteCsvFile(csvFile);
+        fetchParseTimer.record(() -> {
+            try {
+                logger.info("Starting CSV download and processing...");
+                File csvFile = getCsvFile(apiUrl);
+                List<Brand> brands = fetchBrands();
+                logger.info("Fetched brands from TecDoc API");
+                convertToItemsAndSave(csvFile, brands);
+                deleteCsvFile(csvFile);
+                logger.info("Finished CSV download and processing.");
+            } catch (CsvDownloadException | NoDataException | SavingCsvException | CsvConversionException e) {
+                // Re-throw checked exceptions which record doesn't handle well
+                // Or handle them appropriately, maybe log and record failure metric
+                 logger.error("Error during download and save process", e);
+                 // Consider adding a failure counter metric here
+                 throw new RuntimeException(e); // Wrap in unchecked or handle differently
+            } catch (Exception e) {
+                logger.error("Unexpected error during download and save process", e);
+                // Consider adding a failure counter metric here
+                throw e; // Re-throw other exceptions
+            }
+        });
     }
 
     @Async
@@ -167,6 +226,7 @@ public class MedusaService {
     }
 
     private void processItem(Item item) {
+        productsProcessedCounter.increment(); // Count every item processed
         String id = item.getTecDocId().replaceAll("[^a-zA-Z0-9-_]", "");
 
         Product existingProduct = productService.findById(id);
@@ -203,8 +263,10 @@ public class MedusaService {
             productVariantInventoryItemService.saveWithQuery(productVariantInventoryItem);
             productVariantService.saveWithQuery(productVariant);
             productVariantPriceSetService.saveWithQuery(productVariantPriceSet);
+            productsCreatedCounter.increment(); // Increment after successful save
         } catch (Exception e) {
             logger.info("Error occurred while saving product: {}, error: {}", item.getTecDocId(), e.getMessage());
+            // Optionally decrement processed counter or add error counter if save fails?
         }
     }
 
@@ -230,6 +292,7 @@ public class MedusaService {
 
         inventoryLevelService.updateStockedQuantity(inventoryLevel);
         priceService.updateAmount(price);
+        productsUpdatedCounter.increment(); // Increment after successful update
     }
 
     private void deleteCsvFile(File csvFile) {
