@@ -38,7 +38,6 @@ public class MedusaService {
     private final ProductVariantInventoryItemService productVariantInventoryItemService;
     private final ProductVariantService productVariantService;
     private final ProductVariantPriceSetService productVariantPriceSetService;
-    private final String[] testBrand = {"Herth+Buss Elparts", "METZGER", "FEBI BILSTEIN", "JP GROUP", "vika", "FAST", "OREX", "TOTAL"};
     @Value("${darma.url}")
     private String apiUrl;
 
@@ -131,13 +130,12 @@ public class MedusaService {
     }
 
     private void convertToItemsAndSave(File csvFile, List<Brand> brands) throws CsvConversionException {
-        Map<String, Integer> brandMap = createBrandMap(brands);
-
         try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
+            Map<String, Integer> brandMap = createBrandMap(brands);
             br.lines()
                     .skip(1)
                     .map(this::getItem)
-                    .filter(this::isValidItem)
+                    .filter(item -> isValidItem(item, brandMap))
                     .peek(item -> pairTecDocSupplierNameToDataSupplierId(item, brandMap))
                     .forEach(this::processItem);
         } catch (IOException e) {
@@ -151,9 +149,9 @@ public class MedusaService {
                 .collect(Collectors.toMap(Brand::getMfrName, Brand::getDataSupplierId));
     }
 
-    private boolean isValidItem(Item item) {
+    private boolean isValidItem(Item item, Map<String, Integer> brandMap) {
         return item.getManufacturer() != null &&
-                Arrays.stream(testBrand).anyMatch(item.getManufacturer()::contains) &&
+                brandMap.containsKey(item.getTecDocSupplierName()) &&
                 item.getTecDocSupplierName() != null &&
                 item.getTecDocId() != null &&
                 (!Objects.equals(item.getMainStock(), "0") ||
