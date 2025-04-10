@@ -1,7 +1,9 @@
 package cz.pps.auto_dl_be.controller;
 
+import cz.pps.auto_dl_be.dto.ProductDetailDto;
 import cz.pps.auto_dl_be.model.ProductEntity;
 import cz.pps.auto_dl_be.service.MedusaService;
+import cz.pps.auto_dl_be.service.ProductDetailService;
 import cz.pps.auto_dl_be.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -16,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/items")
 @RequiredArgsConstructor
@@ -24,6 +28,7 @@ public class ItemController {
     private static final Logger logger = LoggerFactory.getLogger(ItemController.class);
     private final MedusaService medusaService;
     private final ProductService productService;
+    private final ProductDetailService productDetailService;
 
 
     @GetMapping()
@@ -53,6 +58,17 @@ public class ItemController {
     @GetMapping("/heartbeat")
     public ResponseEntity<Void> heartbeat() {
         return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @GetMapping("/product-details")
+    public ResponseEntity<List<ProductDetailDto>> getProductDetails(@RequestParam List<String> ids) {
+        try {
+            List<ProductDetailDto> productDetails = productDetailService.getProductDetailsById(ids);
+            return new ResponseEntity<>(productDetails, HttpStatus.OK);
+        } catch (Exception e) {
+            logger.error("Error fetching product details: ", e);
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @Scheduled(cron = "0 0 4 * * ?")
