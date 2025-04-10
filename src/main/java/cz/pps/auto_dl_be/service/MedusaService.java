@@ -52,6 +52,11 @@ public class MedusaService {
     private final Counter productsProcessedCounter;
     private final Counter productsCreatedCounter;
     private final Counter productsUpdatedCounter;
+    private final Counter productsFailedCounter;
+    private final Timer tecDocApiTimer;
+    private final Counter tecDocApiFailureCounter;
+    private final Counter skippedItemCounter;
+
 
     @Value("${darma.url}")
     private String apiUrl;
@@ -81,6 +86,20 @@ public class MedusaService {
                 .register(meterRegistry);
         this.productsUpdatedCounter = Counter.builder("autodl.products.updated.total")
                 .description("Total number of existing products updated")
+                .register(meterRegistry);
+        this.productsFailedCounter = Counter.builder("autodl.products.failed.total")
+                .description("Total number of products that failed to save or update")
+                .register(meterRegistry);
+        this.tecDocApiTimer = Timer.builder("autodl.tecdoc.api.duration")
+                .description("Time taken for TecDoc API calls")
+                .tags("operation", "") // Tag will be set dynamically
+                .register(meterRegistry);
+        this.tecDocApiFailureCounter = Counter.builder("autodl.tecdoc.api.failures.total")
+                .description("Total number of TecDoc API call failures")
+                .tags("operation", "") // Tag will be set dynamically
+                .register(meterRegistry);
+        this.skippedItemCounter = Counter.builder("autodl.products.skipped.invalid")
+                .description("Total number of items skipped due to being invalid or missing brand mapping")
                 .register(meterRegistry);
     }
 
@@ -181,12 +200,26 @@ public class MedusaService {
     }
 
     private List<Brand> fetchBrands() throws NoDataException {
-        List<Brand> brands = tecDocService.fetchBrands().block();
-        if (brands == null || brands.isEmpty()) {
-            throw new NoDataException("No brands received from TecDoc API");
+        Timer.Sample sample = Timer.start(meterRegistry);
+        try {
+            List<Brand> brands = tecDocService.fetchBrands().block();
+            if (brands == null || brands.isEmpty()) {
+                tecDocApiFailureCounter.increment(); // Increment failure counter
+                throw new NoDataException("No brands received from TecDoc API");
+            }
+            sample.stop(tecDocApiTimer.tag("operation", "fetchBrands")); // Stop timer on success
+            return brands;
+        } catch (Exception e) {
+            sample.stop(tecDocApiTimer.tag("operation", "fetchBrands")); // Stop timer even on failure
+            tecDocApiFailureCounter.increment(); // Increment failure counter
+            logger.error("Error fetching brands from TecDoc", e);
+            if (e instanceof NoDataException) {
+                throw e; // Re-throw specific exception
+            }
+            throw new RuntimeException("Failed to fetch brands", e); // Wrap other exceptions
         }
-        return brands;
     }
+
 
     private void convertToItemsAndSave(File csvFile, List<Brand> brands) throws CsvConversionException {
         try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
@@ -194,7 +227,13 @@ public class MedusaService {
             br.lines()
                     .skip(1)
                     .map(this::getItem)
-                    .filter(item -> isValidItem(item, brandMap))
+                    .filter(item -> {
+                        boolean valid = isValidItem(item, brandMap);
+                        if (!valid) {
+                            skippedItemCounter.increment(); // Increment skipped counter if invalid
+                        }
+                        return valid;
+                    })
                     .peek(item -> pairTecDocSupplierNameToDataSupplierId(item, brandMap))
                     .forEach(this::processItem);
         } catch (IOException e) {
@@ -232,9 +271,23 @@ public class MedusaService {
         Product existingProduct = productService.findById(id);
         if (existingProduct == null) {
             logger.info("Saving new product: {}", id);
-            List<Article> articles = tecDocService.fetchArticles(item.getTecDocId(), item.getTecDocSupplierID()).block();
-            if (articles != null && !articles.isEmpty()) {
-                saveArticlesToDatabase(articles.getFirst(), item);
+            Timer.Sample sample = Timer.start(meterRegistry);
+            List<Article> articles = null;
+            try {
+                articles = tecDocService.fetchArticles(item.getTecDocId(), item.getTecDocSupplierID()).block();
+                sample.stop(tecDocApiTimer.tag("operation", "fetchArticles")); // Stop timer on success
+                if (articles != null && !articles.isEmpty()) {
+                    saveArticlesToDatabase(articles.getFirst(), item);
+                } else {
+                    logger.warn("No articles found for TecDoc ID: {}, Supplier ID: {}", item.getTecDocId(), item.getTecDocSupplierID());
+                    tecDocApiFailureCounter.increment(); // Count as failure if no articles returned
+                    productsFailedCounter.increment(); // Also count as product failure
+                }
+            } catch (Exception e) {
+                sample.stop(tecDocApiTimer.tag("operation", "fetchArticles")); // Stop timer even on failure
+                tecDocApiFailureCounter.increment(); // Increment TecDoc failure counter
+                productsFailedCounter.increment(); // Also count as product failure
+                logger.error("Error fetching articles for TecDoc ID: {}, Supplier ID: {}", item.getTecDocId(), item.getTecDocSupplierID(), e);
             }
         } else {
             logger.info("Updating existing product: {}", id);
@@ -266,7 +319,7 @@ public class MedusaService {
             productsCreatedCounter.increment(); // Increment after successful save
         } catch (Exception e) {
             logger.info("Error occurred while saving product: {}, error: {}", item.getTecDocId(), e.getMessage());
-            // Optionally decrement processed counter or add error counter if save fails?
+            productsFailedCounter.increment(); // Increment failure counter
         }
     }
 
@@ -283,6 +336,7 @@ public class MedusaService {
             productVariantService.updateProductVariant(productVariant);
         } catch (Exception e) {
             logger.info("Error occurred while updating product: {}, error: {}", productEntity.getTecDocId(), e.getMessage());
+            productsFailedCounter.increment(); // Increment failure counter
         }
     }
 
