@@ -12,10 +12,26 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - name: Notify Deployment Start
+        env: # Add env block to easily access commit message
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          # Construct the pipeline URL correctly using GitHub context variables
+          RAW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          # Create a properly formatted URL
+          PIPELINE_URL="$RAW_URL"
+          # Added rocket emoji, Java icon, and commit message
+          START_MESSAGE="🚀 *PROD Deploy / ☕ AutoDL Backend*\n${{ github.actor }} started new deploy of branch \`${{ github.ref_name }}\` to production.\nCommit: \`${COMMIT_MESSAGE}\`\nPipeline Link: ${PIPELINE_URL}"
+          # Escape special characters for JSON
+          ESCAPED_START_MESSAGE=$(echo "$START_MESSAGE" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+          curl -s -X POST -H 'Content-Type: application/json' \
+               -d "{\"text\": \"$ESCAPED_START_MESSAGE\"}" \
+               '${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}' || echo "Warning: Failed to send start notification."
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'adopt'
@@ -36,11 +52,12 @@ jobs:
         run: echo "BRANCH_NAME=main" >> $GITHUB_ENV
 
       - name: Set up SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.AZURE_SERVER_IP }} >> ~/.ssh/known_hosts
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add known hosts
+        run: ssh-keyscan -H ${{ secrets.AZURE_SERVER_IP }} >> ~/.ssh/known_hosts
 
       - name: Prepare server
         env:
@@ -75,17 +92,17 @@ jobs:
           # Install Docker Compose if not already installed
           if ! command -v docker-compose &> /dev/null; then
             echo "Installing Docker Compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
           fi
 
-          # Clean up Docker resources to free disk space
+          # Clean up Docker resources to free disk space (more selective cleanup)
           echo "\n=== Cleaning up Docker resources ==="
-          echo "Removing unused containers, networks, and volumes..."
+          echo "Removing unused containers and networks..."
           sudo docker system prune -f
 
-          echo "Removing unused images..."
-          sudo docker image prune -a -f
+          echo "Removing dangling images..."
+          sudo docker image prune -f
 
           echo "Removing dangling volumes..."
           sudo docker volume prune -f
@@ -126,10 +143,13 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TECDOC_API_KEY: ${{ secrets.TECDOC_API_KEY }}
           DARMA_URL: ${{ secrets.DARMA_URL }}
+          FILTER_API_KEY: ${{ secrets.FILTER_API_KEY }}
           BRANCH_NAME: ${{ env.BRANCH_NAME }}
+          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }} # Pass the secret as an env var
         run: |
           # Deploy the application
           ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "bash -s" << EOF
+
           # Use absolute paths based on the user's home directory
           echo "Setting up deployment directories..."
 
@@ -190,7 +210,7 @@ jobs:
             echo "darma.url=${DARMA_URL}" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
             echo "tecdoc.api.url=https://webservice.tecalliance.services/pegasus-3-0/services/TecdocToCatDLB.soapEndpoint" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
             echo "tecdoc.api.key=${TECDOC_API_KEY}" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "filter.apikey=BTtW4BWlUrDkbloYTQrIsvNcaTNoOGc7y2Wb2TpjIV8=" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
+            echo "filter.apikey=${FILTER_API_KEY}" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
           fi
 
           # Build and start the application
@@ -224,3 +244,35 @@ jobs:
 
           echo "Deployment completed successfully!"
           EOF
+
+      - name: Notify Deployment Result
+        if: always() # Ensures this step runs even if previous steps fail
+        env: # Add env block to easily access commit message
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          # Construct the pipeline URL correctly using GitHub context variables
+          RAW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          # Create a properly formatted URL
+          PIPELINE_URL="$RAW_URL"
+          if [ "${{ job.status }}" == "success" ]; then
+            # Added emoji icon back
+            STATUS_ICON="✅"
+            STATUS_TEXT="finished successfully"
+            # Apply Google Chat formatting to suppress link preview
+            FORMATTED_PIPELINE_LINK="<${PIPELINE_URL}|Pipeline Link>"
+            # Added commit message with Java icon
+            MESSAGE="*PROD Deploy / ☕ AutoDL Backend*\n${{ github.actor }} ${STATUS_TEXT} deploying branch \`${{ github.ref_name }}\` to production.\nCommit: \`${COMMIT_MESSAGE}\`\n${FORMATTED_PIPELINE_LINK}"
+          else
+            # Added emoji icon back
+            STATUS_ICON="❌"
+            # Apply Google Chat formatting to suppress link preview
+            FORMATTED_PIPELINE_LINK="<${PIPELINE_URL}|Pipeline Link>"
+            STATUS_TEXT="FAILED"
+            # Added commit message with Java icon
+            MESSAGE="*PROD Deploy / ☕ AutoDL Backend*\nDeployment ${STATUS_TEXT} for branch \`${{ github.ref_name }}\` initiated by ${{ github.actor }}.\nCommit: \`${COMMIT_MESSAGE}\`\n${FORMATTED_PIPELINE_LINK}"
+          fi
+          # Escape special characters for JSON (added status icon prefix back)
+          ESCAPED_MESSAGE=$(echo "$STATUS_ICON $MESSAGE" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+          curl -s -X POST -H 'Content-Type: application/json' \
+               -d "{\"text\": \"$ESCAPED_MESSAGE\"}" \
+               '${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}'
