@@ -118,4 +118,8 @@ public class ProductService {
     public Stream<ProductEntity> getAllProductsAsStream() {
         return productDao.findAllAsStream();
     }
+
+    public Integer getProductCount() {
+        return Math.toIntExact(productDao.count());
+    }
 }

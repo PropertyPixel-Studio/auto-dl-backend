@@ -9,6 +9,10 @@ import cz.pps.auto_dl_be.exception.NoDataException;
 import cz.pps.auto_dl_be.exception.SavingCsvException;
 import cz.pps.auto_dl_be.model.Item;
 import cz.pps.auto_dl_be.model.ProductEntity;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -19,7 +23,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -38,8 +45,51 @@ public class MedusaService {
     private final ProductVariantInventoryItemService productVariantInventoryItemService;
     private final ProductVariantService productVariantService;
     private final ProductVariantPriceSetService productVariantPriceSetService;
+    private final MeterRegistry meterRegistry;
     @Value("${darma.url}")
     private String apiUrl;
+
+    private Counter csvDownloadCounter;
+    private Counter csvConversionCounter;
+    private Counter productSavedCounter;
+    private Counter productUpdatedCounter;
+    private Counter errorCounter;
+    private Timer downloadTimer;
+    private Timer conversionTimer;
+
+    @PostConstruct
+    private void initMetrics() {
+        csvDownloadCounter = Counter.builder("medusa.csv.download.count")
+                .description("Count of downloaded CSV files")
+                .register(meterRegistry);
+
+        csvConversionCounter = Counter.builder("medusa.csv.conversion.count")
+                .description("Count of converted CSV files")
+                .register(meterRegistry);
+
+        productSavedCounter = Counter.builder("medusa.product.saved.count")
+                .description("Count of saved products")
+                .register(meterRegistry);
+
+        productUpdatedCounter = Counter.builder("medusa.product.updated.count")
+                .description("Count of updated products")
+                .register(meterRegistry);
+
+        errorCounter = Counter.builder("medusa.error.count")
+                .description("Count of errors")
+                .register(meterRegistry);
+
+        downloadTimer = Timer.builder("medusa.csv.download.time")
+                .description("Time taken to download CSV file")
+                .register(meterRegistry);
+
+        conversionTimer = Timer.builder("medusa.csv.conversion.time")
+                .description("Time taken to convert CSV file")
+                .register(meterRegistry);
+        meterRegistry.gauge("medusa.product.count",
+                productService,
+                ProductService::getProductCount);
+    }
 
     private static Item getItem(List<String> values) {
         Item item = new Item();
@@ -92,15 +142,22 @@ public class MedusaService {
     }
 
     private String downloadCsvData(WebClient webClient, String apiUrl) throws CsvDownloadException {
+        Timer.Sample sample = Timer.start(meterRegistry);
         try {
-            return webClient.get()
+            String result = webClient.get()
                     .uri(apiUrl)
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
+
+            csvDownloadCounter.increment();
+            return result;
         } catch (Exception e) {
+            errorCounter.increment();
             logger.error("Error occurred while downloading CSV data: {}", e.getMessage(), e);
             throw new CsvDownloadException("Failed to download CSV data from API", e);
+        } finally {
+            sample.stop(downloadTimer);
         }
     }
 
@@ -130,6 +187,7 @@ public class MedusaService {
     }
 
     private void convertToItemsAndSave(File csvFile, List<Brand> brands) throws CsvConversionException {
+        Timer.Sample sample = Timer.start(meterRegistry);
         try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
             Map<String, Integer> brandMap = createBrandMap(brands);
             br.lines()
@@ -138,8 +196,13 @@ public class MedusaService {
                     .filter(item -> isValidItem(item, brandMap))
                     .peek(item -> pairTecDocSupplierNameToDataSupplierId(item, brandMap))
                     .forEach(this::processItem);
+
+            csvConversionCounter.increment();
         } catch (IOException e) {
+            errorCounter.increment();
             throw new CsvConversionException("Failed to convert CSV data to items", e);
+        } finally {
+            sample.stop(conversionTimer);
         }
         logger.info("CSV data has been successfully converted to items and saved to the database");
     }
@@ -175,10 +238,12 @@ public class MedusaService {
             List<Article> articles = tecDocService.fetchArticles(item.getTecDocId(), item.getTecDocSupplierID()).block();
             if (articles != null && !articles.isEmpty()) {
                 saveArticlesToDatabase(articles.getFirst(), item);
+                productSavedCounter.increment();
             }
         } else {
             logger.info("Updating existing product: {}", id);
             updateDarmaDataInDatabase(item);
+            productUpdatedCounter.increment();
         }
     }
 
@@ -204,6 +269,7 @@ public class MedusaService {
             productVariantService.saveWithQuery(productVariant);
             productVariantPriceSetService.saveWithQuery(productVariantPriceSet);
         } catch (Exception e) {
+            errorCounter.increment();
             logger.info("Error occurred while saving product: {}, error: {}", item.getTecDocId(), e.getMessage());
         }
     }
@@ -220,6 +286,7 @@ public class MedusaService {
             priceService.updatePrice(price);
             productVariantService.updateProductVariant(productVariant);
         } catch (Exception e) {
+            errorCounter.increment();
             logger.info("Error occurred while updating product: {}, error: {}", productEntity.getTecDocId(), e.getMessage());
         }
     }

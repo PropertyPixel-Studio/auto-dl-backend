@@ -29,6 +29,14 @@ public class ApiKeyFilter extends GenericFilterBean {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpServletResponse httpResponse = (HttpServletResponse) response;
 
+        // Check if the request is targeting the Prometheus endpoint
+        String requestURI = httpRequest.getRequestURI();
+        if (requestURI != null && (requestURI.equals("/actuator/prometheus") || requestURI.equals("/actuator/health"))) {
+            chain.doFilter(request, response); // Skip API key check for specified Actuator endpoints
+            return;
+        }
+
+        // Otherwise, perform API key check
         String apiKey = httpRequest.getHeader(API_KEY_HEADER);
 
         if (apiKey == null || !apiKey.equals(VALID_API_KEY)) {
