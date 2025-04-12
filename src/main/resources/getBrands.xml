@@ -8,7 +8,7 @@
 
             <tec:lang>CS</tec:lang>
 
-            <tec:provider>24019</tec:provider>
+            <tec:provider>${providerId}</tec:provider>
         </tec:getBrands>
     </soapenv:Body>
 </soapenv:Envelope>

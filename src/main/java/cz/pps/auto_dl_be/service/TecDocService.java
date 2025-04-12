@@ -31,6 +31,8 @@ public class TecDocService {
     private String tecDocUrl;
     @Value("${tecdoc.api.key}")
     private String tecDocKey;
+    @Value("${tecdoc.provider.id}")
+    private String tecDocProviderId;
 
     public TecDocService(WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder.baseUrl(tecDocUrl).build();
@@ -39,11 +41,14 @@ public class TecDocService {
 
     private String getBrandsXml() {
         ClassPathResource resource = new ClassPathResource("getBrands.xml");
+        String template;
         try {
-            return new String(Files.readAllBytes(Paths.get(resource.getURI())));
+            template = new String(Files.readAllBytes(Paths.get(resource.getURI())));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        template = template.replace("${providerId}", tecDocProviderId);
+        return template;
     }
 
     public Mono<List<Brand>> fetchBrands() {

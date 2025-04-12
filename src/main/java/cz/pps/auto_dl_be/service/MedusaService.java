@@ -7,18 +7,12 @@ import cz.pps.auto_dl_be.exception.CsvConversionException;
 import cz.pps.auto_dl_be.exception.CsvDownloadException;
 import cz.pps.auto_dl_be.exception.NoDataException;
 import cz.pps.auto_dl_be.exception.SavingCsvException;
-import cz.pps.auto_dl_be.dto.brands.Brand;
-import cz.pps.auto_dl_be.dto.detail.Article;
-import cz.pps.auto_dl_be.dto.medusa.*;
-import cz.pps.auto_dl_be.exception.CsvConversionException;
-import cz.pps.auto_dl_be.exception.CsvDownloadException;
-import cz.pps.auto_dl_be.exception.NoDataException;
-import cz.pps.auto_dl_be.exception.SavingCsvException;
 import cz.pps.auto_dl_be.model.Item;
 import cz.pps.auto_dl_be.model.ProductEntity;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -29,11 +23,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
+@RequiredArgsConstructor
 public class MedusaService {
 
     private static final Logger logger = LoggerFactory.getLogger(MedusaService.class);
@@ -48,61 +46,50 @@ public class MedusaService {
     private final ProductVariantService productVariantService;
     private final ProductVariantPriceSetService productVariantPriceSetService;
     private final MeterRegistry meterRegistry;
-    private final Timer fetchParseTimer;
-    private final Counter productsProcessedCounter;
-    private final Counter productsCreatedCounter;
-    private final Counter productsUpdatedCounter;
-    private final Counter productsFailedCounter;
-    private final Timer tecDocApiTimer;
-    private final Counter tecDocApiFailureCounter;
-    private final Counter skippedItemCounter;
-
-
     @Value("${darma.url}")
     private String apiUrl;
 
-    public MedusaService(TecDocService tecDocService, InventoryItemService inventoryItemService, InventoryLevelService inventoryLevelService, PriceService priceService, PriceSetService priceSetService, ProductSalesChannelService productSalesChannelService, ProductService productService, ProductVariantInventoryItemService productVariantInventoryItemService, ProductVariantService productVariantService, ProductVariantPriceSetService productVariantPriceSetService, MeterRegistry meterRegistry) {
-        this.tecDocService = tecDocService;
-        this.inventoryItemService = inventoryItemService;
-        this.inventoryLevelService = inventoryLevelService;
-        this.priceService = priceService;
-        this.priceSetService = priceSetService;
-        this.productSalesChannelService = productSalesChannelService;
-        this.productService = productService;
-        this.productVariantInventoryItemService = productVariantInventoryItemService;
-        this.productVariantService = productVariantService;
-        this.productVariantPriceSetService = productVariantPriceSetService;
-        this.meterRegistry = meterRegistry;
+    private Counter csvDownloadCounter;
+    private Counter csvConversionCounter;
+    private Counter productSavedCounter;
+    private Counter productUpdatedCounter;
+    private Counter errorCounter;
+    private Timer downloadTimer;
+    private Timer conversionTimer;
 
-        // Initialize metrics
-        this.fetchParseTimer = Timer.builder("autodl.fetch.parse.duration")
-                .description("Time taken to fetch CSV, parse, and save/update products")
+    @PostConstruct
+    private void initMetrics() {
+        csvDownloadCounter = Counter.builder("medusa.csv.download.count")
+                .description("Count of downloaded CSV files")
                 .register(meterRegistry);
-        this.productsProcessedCounter = Counter.builder("autodl.products.processed.total")
-                .description("Total number of products processed from CSV")
+
+        csvConversionCounter = Counter.builder("medusa.csv.conversion.count")
+                .description("Count of converted CSV files")
                 .register(meterRegistry);
-        this.productsCreatedCounter = Counter.builder("autodl.products.created.total")
-                .description("Total number of new products created")
+
+        productSavedCounter = Counter.builder("medusa.product.saved.count")
+                .description("Count of saved products")
                 .register(meterRegistry);
-        this.productsUpdatedCounter = Counter.builder("autodl.products.updated.total")
-                .description("Total number of existing products updated")
+
+        productUpdatedCounter = Counter.builder("medusa.product.updated.count")
+                .description("Count of updated products")
                 .register(meterRegistry);
-        this.productsFailedCounter = Counter.builder("autodl.products.failed.total")
-                .description("Total number of products that failed to save or update")
+
+        errorCounter = Counter.builder("medusa.error.count")
+                .description("Count of errors")
                 .register(meterRegistry);
-        this.tecDocApiTimer = Timer.builder("autodl.tecdoc.api.duration")
-                .description("Time taken for TecDoc API calls")
-                .tags("operation", "") // Tag will be set dynamically
+
+        downloadTimer = Timer.builder("medusa.csv.download.time")
+                .description("Time taken to download CSV file")
                 .register(meterRegistry);
-        this.tecDocApiFailureCounter = Counter.builder("autodl.tecdoc.api.failures.total")
-                .description("Total number of TecDoc API call failures")
-                .tags("operation", "") // Tag will be set dynamically
+
+        conversionTimer = Timer.builder("medusa.csv.conversion.time")
+                .description("Time taken to convert CSV file")
                 .register(meterRegistry);
-        this.skippedItemCounter = Counter.builder("autodl.products.skipped.invalid")
-                .description("Total number of items skipped due to being invalid or missing brand mapping")
-                .register(meterRegistry);
+        meterRegistry.gauge("medusa.product.count",
+                productService,
+                ProductService::getProductCount);
     }
-
 
     private static Item getItem(List<String> values) {
         Item item = new Item();
@@ -124,27 +111,12 @@ public class MedusaService {
 
     @Async
     public void downloadAndSaveCsvAsItems() throws CsvDownloadException, NoDataException, SavingCsvException, CsvConversionException {
-        fetchParseTimer.record(() -> {
-            try {
-                logger.info("Starting CSV download and processing...");
-                File csvFile = getCsvFile(apiUrl);
-                List<Brand> brands = fetchBrands();
-                logger.info("Fetched brands from TecDoc API");
-                convertToItemsAndSave(csvFile, brands);
-                deleteCsvFile(csvFile);
-                logger.info("Finished CSV download and processing.");
-            } catch (CsvDownloadException | NoDataException | SavingCsvException | CsvConversionException e) {
-                // Re-throw checked exceptions which record doesn't handle well
-                // Or handle them appropriately, maybe log and record failure metric
-                 logger.error("Error during download and save process", e);
-                 // Consider adding a failure counter metric here
-                 throw new RuntimeException(e); // Wrap in unchecked or handle differently
-            } catch (Exception e) {
-                logger.error("Unexpected error during download and save process", e);
-                // Consider adding a failure counter metric here
-                throw e; // Re-throw other exceptions
-            }
-        });
+        logger.info("Downloading CSV data from Darma");
+        File csvFile = getCsvFile(apiUrl);
+        List<Brand> brands = fetchBrands();
+        logger.info("Fetched brands from TecDoc API");
+        convertToItemsAndSave(csvFile, brands);
+        deleteCsvFile(csvFile);
     }
 
     @Async
@@ -170,15 +142,22 @@ public class MedusaService {
     }
 
     private String downloadCsvData(WebClient webClient, String apiUrl) throws CsvDownloadException {
+        Timer.Sample sample = Timer.start(meterRegistry);
         try {
-            return webClient.get()
+            String result = webClient.get()
                     .uri(apiUrl)
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
+
+            csvDownloadCounter.increment();
+            return result;
         } catch (Exception e) {
+            errorCounter.increment();
             logger.error("Error occurred while downloading CSV data: {}", e.getMessage(), e);
             throw new CsvDownloadException("Failed to download CSV data from API", e);
+        } finally {
+            sample.stop(downloadTimer);
         }
     }
 
@@ -200,44 +179,30 @@ public class MedusaService {
     }
 
     private List<Brand> fetchBrands() throws NoDataException {
-        Timer.Sample sample = Timer.start(meterRegistry);
-        try {
-            List<Brand> brands = tecDocService.fetchBrands().block();
-            if (brands == null || brands.isEmpty()) {
-                tecDocApiFailureCounter.increment(); // Increment failure counter
-                throw new NoDataException("No brands received from TecDoc API");
-            }
-            sample.stop(tecDocApiTimer.tag("operation", "fetchBrands")); // Stop timer on success
-            return brands;
-        } catch (Exception e) {
-            sample.stop(tecDocApiTimer.tag("operation", "fetchBrands")); // Stop timer even on failure
-            tecDocApiFailureCounter.increment(); // Increment failure counter
-            logger.error("Error fetching brands from TecDoc", e);
-            if (e instanceof NoDataException) {
-                throw e; // Re-throw specific exception
-            }
-            throw new RuntimeException("Failed to fetch brands", e); // Wrap other exceptions
+        List<Brand> brands = tecDocService.fetchBrands().block();
+        if (brands == null || brands.isEmpty()) {
+            throw new NoDataException("No brands received from TecDoc API");
         }
+        return brands;
     }
 
-
     private void convertToItemsAndSave(File csvFile, List<Brand> brands) throws CsvConversionException {
+        Timer.Sample sample = Timer.start(meterRegistry);
         try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
             Map<String, Integer> brandMap = createBrandMap(brands);
             br.lines()
                     .skip(1)
                     .map(this::getItem)
-                    .filter(item -> {
-                        boolean valid = isValidItem(item, brandMap);
-                        if (!valid) {
-                            skippedItemCounter.increment(); // Increment skipped counter if invalid
-                        }
-                        return valid;
-                    })
+                    .filter(item -> isValidItem(item, brandMap))
                     .peek(item -> pairTecDocSupplierNameToDataSupplierId(item, brandMap))
                     .forEach(this::processItem);
+
+            csvConversionCounter.increment();
         } catch (IOException e) {
+            errorCounter.increment();
             throw new CsvConversionException("Failed to convert CSV data to items", e);
+        } finally {
+            sample.stop(conversionTimer);
         }
         logger.info("CSV data has been successfully converted to items and saved to the database");
     }
@@ -265,33 +230,20 @@ public class MedusaService {
     }
 
     private void processItem(Item item) {
-        productsProcessedCounter.increment(); // Count every item processed
         String id = item.getTecDocId().replaceAll("[^a-zA-Z0-9-_]", "");
 
         Product existingProduct = productService.findById(id);
         if (existingProduct == null) {
             logger.info("Saving new product: {}", id);
-            Timer.Sample sample = Timer.start(meterRegistry);
-            List<Article> articles = null;
-            try {
-                articles = tecDocService.fetchArticles(item.getTecDocId(), item.getTecDocSupplierID()).block();
-                sample.stop(tecDocApiTimer.tag("operation", "fetchArticles")); // Stop timer on success
-                if (articles != null && !articles.isEmpty()) {
-                    saveArticlesToDatabase(articles.getFirst(), item);
-                } else {
-                    logger.warn("No articles found for TecDoc ID: {}, Supplier ID: {}", item.getTecDocId(), item.getTecDocSupplierID());
-                    tecDocApiFailureCounter.increment(); // Count as failure if no articles returned
-                    productsFailedCounter.increment(); // Also count as product failure
-                }
-            } catch (Exception e) {
-                sample.stop(tecDocApiTimer.tag("operation", "fetchArticles")); // Stop timer even on failure
-                tecDocApiFailureCounter.increment(); // Increment TecDoc failure counter
-                productsFailedCounter.increment(); // Also count as product failure
-                logger.error("Error fetching articles for TecDoc ID: {}, Supplier ID: {}", item.getTecDocId(), item.getTecDocSupplierID(), e);
+            List<Article> articles = tecDocService.fetchArticles(item.getTecDocId(), item.getTecDocSupplierID()).block();
+            if (articles != null && !articles.isEmpty()) {
+                saveArticlesToDatabase(articles.getFirst(), item);
+                productSavedCounter.increment();
             }
         } else {
             logger.info("Updating existing product: {}", id);
             updateDarmaDataInDatabase(item);
+            productUpdatedCounter.increment();
         }
     }
 
@@ -316,10 +268,9 @@ public class MedusaService {
             productVariantInventoryItemService.saveWithQuery(productVariantInventoryItem);
             productVariantService.saveWithQuery(productVariant);
             productVariantPriceSetService.saveWithQuery(productVariantPriceSet);
-            productsCreatedCounter.increment(); // Increment after successful save
         } catch (Exception e) {
+            errorCounter.increment();
             logger.info("Error occurred while saving product: {}, error: {}", item.getTecDocId(), e.getMessage());
-            productsFailedCounter.increment(); // Increment failure counter
         }
     }
 
@@ -335,8 +286,8 @@ public class MedusaService {
             priceService.updatePrice(price);
             productVariantService.updateProductVariant(productVariant);
         } catch (Exception e) {
+            errorCounter.increment();
             logger.info("Error occurred while updating product: {}, error: {}", productEntity.getTecDocId(), e.getMessage());
-            productsFailedCounter.increment(); // Increment failure counter
         }
     }
 
@@ -346,7 +297,6 @@ public class MedusaService {
 
         inventoryLevelService.updateStockedQuantity(inventoryLevel);
         priceService.updateAmount(price);
-        productsUpdatedCounter.increment(); // Increment after successful update
     }
 
     private void deleteCsvFile(File csvFile) {
