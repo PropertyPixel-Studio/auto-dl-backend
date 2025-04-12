@@ -22,8 +22,10 @@ jobs:
           RAW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           # Create a properly formatted URL
           PIPELINE_URL="$RAW_URL"
-          # Added rocket emoji, Java icon, and commit message
-          START_MESSAGE="🚀 *PROD Deploy / ☕ AutoDL Backend*\n${{ github.actor }} started new deploy of branch \`${{ github.ref_name }}\` to production.\nCommit: \`${COMMIT_MESSAGE}\`\nPipeline Link: ${PIPELINE_URL}"
+          # Apply Google Chat formatting to suppress link preview
+          FORMATTED_PIPELINE_LINK="<${PIPELINE_URL}|Pipeline Link>"
+          # Added rocket emoji, Java icon, and commit message using formatted link
+          START_MESSAGE="🚀 *PROD Deploy / ☕ AutoDL Backend*\n${{ github.actor }} started new deploy of branch \`${{ github.ref_name }}\` to production.\nCommit: \`${COMMIT_MESSAGE}\`\n${FORMATTED_PIPELINE_LINK}"
           # Escape special characters for JSON
           ESCAPED_START_MESSAGE=$(echo "$START_MESSAGE" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
           curl -s -X POST -H 'Content-Type: application/json' \
