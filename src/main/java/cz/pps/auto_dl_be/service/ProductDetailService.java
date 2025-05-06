@@ -25,9 +25,13 @@ public class ProductDetailService {
     private final PriceDao priceDao;
 
     public List<ProductDetailDto> getProductDetailsById(List<String> ids) {
-        CompletableFuture<List<ProductEntity>> productsFuture = fetchProducts(ids);
-        CompletableFuture<List<InventoryLevelEntity>> inventoriesFuture = fetchInventories(ids);
-        CompletableFuture<List<PriceEntity>> pricesFuture = fetchPrices(ids);
+        List<String> cleanedIds = ids.stream()
+                .map(id -> id.replaceAll("[^a-zA-Z0-9-_]", ""))
+                .collect(Collectors.toList());
+
+        CompletableFuture<List<ProductEntity>> productsFuture = fetchProducts(cleanedIds);
+        CompletableFuture<List<InventoryLevelEntity>> inventoriesFuture = fetchInventories(cleanedIds);
+        CompletableFuture<List<PriceEntity>> pricesFuture = fetchPrices(cleanedIds);
 
         CompletableFuture.allOf(productsFuture, inventoriesFuture, pricesFuture).join();
 
