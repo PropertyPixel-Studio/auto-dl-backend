@@ -36,6 +36,7 @@ public class ApiKeyFilter extends GenericFilterBean {
                 requestURI.equals("/actuator/health") ||
                 requestURI.startsWith("/swagger-ui") ||
                 requestURI.startsWith("/api-docs") ||
+                requestURI.startsWith("/v3/api-docs") ||
                 requestURI.equals("/swagger-ui.html"))) {
             chain.doFilter(request, response); // Skip API key check
             return;
