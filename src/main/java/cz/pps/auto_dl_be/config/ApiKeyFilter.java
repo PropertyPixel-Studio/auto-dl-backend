@@ -32,12 +32,30 @@ public class ApiKeyFilter extends GenericFilterBean {
         // Check if the request is targeting the excluded endpoints
         String requestURI = httpRequest.getRequestURI();
         if (requestURI != null && (
+                // Actuator endpoints
                 requestURI.equals("/actuator/prometheus") ||
                 requestURI.equals("/actuator/health") ||
+                requestURI.startsWith("/actuator/") ||
+                
+                // Swagger UI endpoints - expanded to include all possible paths
+                requestURI.startsWith("/swagger") ||
                 requestURI.startsWith("/swagger-ui") ||
+                requestURI.startsWith("/swagger-resources") ||
+                requestURI.equals("/swagger-ui.html") ||
+                
+                // OpenAPI endpoints
                 requestURI.startsWith("/api-docs") ||
                 requestURI.startsWith("/v3/api-docs") ||
-                requestURI.equals("/swagger-ui.html"))) {
+                requestURI.startsWith("/v2/api-docs") ||
+                
+                // Webjars (used by Swagger UI)
+                requestURI.startsWith("/webjars/") ||
+                
+                // Common SpringDoc paths
+                requestURI.startsWith("/springdoc") ||
+                
+                // Error page
+                requestURI.equals("/error"))) {
             chain.doFilter(request, response); // Skip API key check
             return;
         }
