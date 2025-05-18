@@ -2,10 +2,13 @@ package cz.pps.auto_dl_be.controller;
 
 import cz.pps.auto_dl_be.dto.ProductDetailDto;
 import cz.pps.auto_dl_be.dto.ProductIdsRequestDto;
+import cz.pps.auto_dl_be.dto.detail.Article;
+import cz.pps.auto_dl_be.model.Item;
 import cz.pps.auto_dl_be.model.ProductEntity;
 import cz.pps.auto_dl_be.service.MedusaService;
 import cz.pps.auto_dl_be.service.ProductDetailService;
 import cz.pps.auto_dl_be.service.ProductService;
+import cz.pps.auto_dl_be.service.TecDocService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -31,6 +34,7 @@ public class ItemController {
     private final MedusaService medusaService;
     private final ProductService productService;
     private final ProductDetailService productDetailService;
+    private final TecDocService tecDocService;
 
 
     @Operation(summary = "Saves items to the database", description = "Downloads a CSV file and saves items to the database.")
@@ -104,5 +108,49 @@ public class ItemController {
     @Scheduled(cron = "0 0 0 1 * ?")
     public void scheduledUpdateItemsInB() {
         medusaService.updateDataInDatabase();
+    }
+
+    @Operation(summary = "Add single test product", description = "Adds a single test product to the database for testing.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Test product was successfully added."),
+            @ApiResponse(responseCode = "400", description = "Invalid request parameters.", content = @Content),
+            @ApiResponse(responseCode = "500", description = "An internal server error occurred.", content = @Content)
+    })
+    @PostMapping("/test-product")
+    public ResponseEntity<String> addTestProduct(
+            @RequestParam String tecDocId,
+            @RequestParam String supplierId,
+            @RequestParam(defaultValue = "1") String mainStock,
+            @RequestParam(defaultValue = "0") String otherBranchStock,
+            @RequestParam(defaultValue = "0") String supplierStock,
+            @RequestParam(defaultValue = "1000") String price) {
+        
+        try {
+            List<Article> articles = tecDocService.fetchArticles(tecDocId, supplierId).block();
+            
+            if (articles == null || articles.isEmpty()) {
+                return ResponseEntity.badRequest().body("No articles found for the given tecDocId and supplierId");
+            }
+            
+            Article article = articles.getFirst();
+            
+            // Create an Item with the necessary data
+            Item item = new Item();
+            item.setTecDocId(tecDocId);
+            item.setTecDocSupplierID(supplierId);
+            item.setMainStock(mainStock);
+            item.setOtherBranchStock(otherBranchStock);
+            item.setSupplierStock(supplierStock);
+            item.setPrice(price);
+            
+            // Save the article to the database
+            medusaService.saveArticlesToDatabase(article, item);
+            
+            return ResponseEntity.ok("Test product added successfully: " + tecDocId);
+        } catch (Exception e) {
+            logger.error("Error adding test product: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Error adding test product: " + e.getMessage());
+        }
     }
 }

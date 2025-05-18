@@ -14,6 +14,6 @@ public class ProductSalesChannel {
     public ProductSalesChannel(Article article) {
         this.id = "prodsc_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
         this.product_id = "prod_" + article.getArticleNumber().replaceAll("[^a-zA-Z0-9-_]", "");
-        this.sales_channel_id = "sc_01JKBX85GG5BV0533D14VDY1RB";
+        this.sales_channel_id = "sc_01JRD5A7QZJ5NPJ1263F8TA2DX";
     }
 }

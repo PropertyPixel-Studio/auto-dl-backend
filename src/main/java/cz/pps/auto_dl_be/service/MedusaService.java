@@ -247,7 +247,7 @@ public class MedusaService {
         }
     }
 
-    private void saveArticlesToDatabase(Article article, Item item) {
+    public void saveArticlesToDatabase(Article article, Item item) {
         try {
             InventoryItem inventoryItem = new InventoryItem(article);
             InventoryLevel inventoryLevel = new InventoryLevel(article, item.getMainStock(), item.getSupplierStock(), item.getOtherBranchStock());
@@ -271,6 +271,7 @@ public class MedusaService {
         } catch (Exception e) {
             errorCounter.increment();
             logger.info("Error occurred while saving product: {}, error: {}", item.getTecDocId(), e.getMessage());
+            throw e; // Rethrow to let the controller handle it
         }
     }
 
