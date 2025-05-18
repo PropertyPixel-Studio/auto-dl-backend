@@ -136,14 +136,22 @@ public class ItemController {
             
             Article article = articles.getFirst();
             
-            // Create an Item with the necessary data
-            Item item = new Item();
-            item.setTecDocId(tecDocId);
-            item.setTecDocSupplierID(supplierId);
-            item.setMainStock(mainStock);
-            item.setOtherBranchStock(otherBranchStock);
-            item.setSupplierStock(supplierStock);
-            item.setPrice(price);
+            // Create an Item with the necessary data using constructor
+            Item item = new Item(
+                null,  // productCode
+                null,  // manufacturer
+                null,  // productName
+                mainStock,
+                otherBranchStock,
+                supplierStock,
+                price,
+                null,  // vatRate
+                null,  // currency
+                null,  // deposit
+                tecDocId,
+                null,  // tecDocSupplierName
+                supplierId
+            );
             
             // Save the article to the database
             medusaService.saveArticlesToDatabase(article, item);

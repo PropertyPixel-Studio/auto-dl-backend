@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Configuration;
     name = "apiKey",
     type = SecuritySchemeType.APIKEY,
     paramName = "API-KEY",
-    in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER,
+    in = io.swagger.v3.oas.annotations.enums.SecuritySchemeIn.HEADER,
     description = "API key authentication"
 )
 public class OpenApiConfig {
