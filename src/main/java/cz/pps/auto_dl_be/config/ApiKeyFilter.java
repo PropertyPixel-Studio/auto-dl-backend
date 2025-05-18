@@ -32,9 +32,12 @@ public class ApiKeyFilter extends GenericFilterBean {
         // Check if the request is targeting the excluded endpoints
         String requestURI = httpRequest.getRequestURI();
         if (requestURI != null && (
-                // Actuator endpoints
-                requestURI.equals("/actuator/prometheus") ||
+                // Health check endpoints - explicitly excluded
+                requestURI.equals("/health") ||
                 requestURI.equals("/actuator/health") ||
+                
+                // Other Actuator endpoints
+                requestURI.equals("/actuator/prometheus") ||
                 requestURI.startsWith("/actuator/") ||
                 
                 // Swagger UI endpoints - expanded to include all possible paths

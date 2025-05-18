@@ -5,28 +5,26 @@ on:
     branches: [ main ]
     paths-ignore:
       - 'README.md'
+      - '.gitignore'
+      - 'docs/**'
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-
+    outputs:
+      version: ${{ steps.set-version.outputs.version }}
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+        
+      - name: Set version
+        id: set-version
+        run: echo "version=$(date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
+        
       - name: Notify Deployment Start
-        env: # Add env block to easily access commit message
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
-          # Construct the pipeline URL correctly using GitHub context variables
-          RAW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          # Create a properly formatted URL
-          PIPELINE_URL="$RAW_URL"
-          # Apply Google Chat formatting to suppress link preview
-          FORMATTED_PIPELINE_LINK="<${PIPELINE_URL}|Pipeline Link>"
-          # Added rocket emoji, Java icon, and commit message using formatted link
-          START_MESSAGE="🚀 *PROD Deploy / ☕ AutoDL Backend*\n${{ github.actor }} started new deploy of branch \`${{ github.ref_name }}\` to production.\nCommit: \`${COMMIT_MESSAGE}\`\n${FORMATTED_PIPELINE_LINK}"
-          # Escape special characters for JSON
+          START_MESSAGE="🚀 *PROD Deploy / ☕ AutoDL Backend*\n${{ github.actor }} started new deploy of branch \`${{ github.ref_name }}\` to production.\nCommit: \`${{ github.event.head_commit.message }}\`\n[${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}](Pipeline Link)"
           ESCAPED_START_MESSAGE=$(echo "$START_MESSAGE" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
           curl -s -X POST -H 'Content-Type: application/json' \
                -d "{\"text\": \"$ESCAPED_START_MESSAGE\"}" \
@@ -37,244 +35,158 @@ jobs:
         with:
           java-version: '21'
           distribution: 'adopt'
-
-      - name: Grant execute permission for mvnw
-        run: chmod +x ./mvnw
-
+          cache: 'maven'
+      
       - name: Build with Maven
-        run: ./mvnw clean package -DskipTests
-
-      - name: Create deployment package
         run: |
-          # Create a zip file of the repository and build artifacts
-          zip -r deploy.zip . -x "*.git*" "*target/classes*" "*target/generated-sources*" "*target/maven-*" "*target/test-*"
+          chmod +x ./mvnw
+          ./mvnw -B clean package -DskipTests --batch-mode --no-transfer-progress
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image and cache layers
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: auto-dl-backend:${{ steps.set-version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Save Docker image to tarball
+        run: |
+          docker save auto-dl-backend:${{ steps.set-version.outputs.version }} | gzip > auto-dl-backend.tar.gz
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: auto-dl-backend
+          path: |
+            auto-dl-backend.tar.gz
+            docker-compose.yml
 
-      # We're only deploying from main branch
-      - name: Set environment variables
-        run: echo "BRANCH_NAME=main" >> $GITHUB_ENV
-
-      - name: Set up SSH
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+    
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: auto-dl-backend
+          
+      - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Add known hosts
-        run: ssh-keyscan -H ${{ secrets.AZURE_SERVER_IP }} >> ~/.ssh/known_hosts
-
+      
+      - name: Add host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.AZURE_SERVER_IP }} >> ~/.ssh/known_hosts
+      
+      - name: Copy files to server
+        run: |
+          # Create deployment directory
+          ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "mkdir -p ~/autodl"
+          
+          # Copy files
+          scp -C auto-dl-backend.tar.gz docker-compose.yml ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }}:/home/${{ secrets.AZURE_USER }}/autodl/
+      
       - name: Prepare server
-        env:
-          BRANCH_NAME: ${{ env.BRANCH_NAME }}
         run: |
-          # Install Docker and Docker Compose if needed
-          ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "bash -s" << EOF
-          export BRANCH_NAME="${BRANCH_NAME}"
+          ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "bash -s" << 'EOF'
+            # Create application.properties in a separate directory to avoid losing it
+            mkdir -p /home/$USER/autodl/config
 
-          # Check disk space before cleanup
-          echo "Disk space before cleanup:"
-          df -h
-          # Install unzip if not already installed
-          if ! command -v unzip &> /dev/null; then
-            echo "Installing unzip..."
-            sudo apt-get update
-            sudo apt-get install -y unzip
-          fi
-
-          # Install Docker if not already installed
-          if ! command -v docker &> /dev/null; then
-            echo "Installing Docker..."
-            sudo apt-get update
-            sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-            sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-            sudo apt-get update
-            sudo apt-get install -y docker-ce
-            sudo usermod -aG docker $USER
-          fi
-
-          # Install Docker Compose if not already installed
-          if ! command -v docker-compose &> /dev/null; then
-            echo "Installing Docker Compose..."
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-          fi
-
-          # Clean up Docker resources to free disk space (more selective cleanup)
-          echo "\n=== Cleaning up Docker resources ==="
-          echo "Removing unused containers and networks..."
-          sudo docker system prune -f
-
-          echo "Removing dangling images..."
-          sudo docker image prune -f
-
-          echo "Removing dangling volumes..."
-          sudo docker volume prune -f
-
-          # Check disk space after cleanup
-          echo "\nDisk space after cleanup:"
-          df -h
-
-          # Create application directories
-          echo "Creating application directories..."
-
-          # Create directories using the home directory shortcut
-          mkdir -p ~/autodl/auto-dl-backend/src/main/resources
-          echo "Created directories"
-
-          # Backup application.properties file if it exists
-          if [ -f ~/autodl/auto-dl-backend/src/main/resources/application.properties ]; then
-            cp ~/autodl/auto-dl-backend/src/main/resources/application.properties /tmp/application.properties.backup
-            echo "Backed up existing application.properties file"
-          fi
+            # Backup application.properties file if it exists
+            if [ -f /home/$USER/autodl/config/application.properties ]; then
+              cp /home/$USER/autodl/config/application.properties /home/$USER/autodl/config/application.properties.backup
+            fi
           EOF
-
-      - name: Prepare and copy deployment package
-        run: |
-          # Create a temporary directory on the server for the deployment package
-          ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "mkdir -p ~/deployment-temp"
-
-          # Copy the zip file to the server
-          echo "Copying deployment package to server..."
-          scp -v deploy.zip ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }}:~/deployment-temp/
-
-          # Verify the file was copied successfully
-          ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "ls -la ~/deployment-temp/"
-
+      
       - name: Deploy application
         env:
-          SERVER_PORT: ${{ secrets.SERVER_PORT }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          TECDOC_API_KEY: ${{ secrets.TECDOC_API_KEY }}
-          DARMA_URL: ${{ secrets.DARMA_URL }}
-          FILTER_API_KEY: ${{ secrets.FILTER_API_KEY }}
-          BRANCH_NAME: ${{ env.BRANCH_NAME }}
-          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }} # Pass the secret as an env var
+          APPLICATION_PROPERTIES: ${{ secrets.APPLICATION_PROPERTIES }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          # Deploy the application
+          VERSION="${{ needs.build.outputs.version }}"
           ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "bash -s" << EOF
-
-          # Use absolute paths based on the user's home directory
-          echo "Setting up deployment directories..."
-
-          # Create the application directory structure
-          mkdir -p ~/autodl/auto-dl-backend/src/main/resources
-
-          # Check the deployment temp directory
-          cd ~/deployment-temp
-          echo "Current directory: $(pwd)"
-
-          # Verify the zip file exists
-          if [ ! -f deploy.zip ]; then
-            echo "Error: deploy.zip not found in $(pwd)!"
-            ls -la
-            exit 1
-          fi
-
-          # Clean the target directory while preserving application.properties
-          echo "Cleaning target directory..."
-          if [ -d ~/autodl/auto-dl-backend ]; then
-            find ~/autodl/auto-dl-backend -mindepth 1 -not -path "*/src/main/resources/application.properties" -delete || true
-          fi
-
-          # Extract the deployment package
-          echo "Extracting deployment package..."
-          unzip -o deploy.zip -d ~/autodl/auto-dl-backend
-          rm deploy.zip
-
-          # Restore application.properties file if it was backed up
-          if [ -f /tmp/application.properties.backup ]; then
-            echo "Restoring application.properties from backup..."
-            mkdir -p ~/autodl/auto-dl-backend/src/main/resources/
-            cp /tmp/application.properties.backup ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            rm /tmp/application.properties.backup
-          else
-            # Create application.properties file from GitHub secrets
-            echo "Creating application.properties file from GitHub secrets..."
-            # Parse the DATABASE_URL to extract components
-            DB_URL=\$(echo "${DATABASE_URL}" | sed -E 's|postgres://([^:]+):([^@]+)@([^:]+):([^/]+)/(.+)$|jdbc:postgresql://\3:\4/\5|')
-            DB_USERNAME=\$(echo "${DATABASE_URL}" | sed -E 's|postgres://([^:]+):([^@]+)@.+$|\1|')
-            DB_PASSWORD=\$(echo "${DATABASE_URL}" | sed -E 's|postgres://[^:]+:([^@]+)@.+$|\1|')
-
-            # Create directory for application.properties if it doesn't exist
-            mkdir -p ~/autodl/auto-dl-backend/src/main/resources/
-
-            # Create application.properties file
-            echo "spring.application.name=auto-dl-be" > ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "# Postgres DB" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "spring.datasource.url=${DB_URL}" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "spring.datasource.username=${DB_USERNAME}" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "spring.datasource.password=${DB_PASSWORD}" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "spring.jpa.hibernate.ddl-auto=update" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "#Others" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "server.port=${SERVER_PORT}" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "darma.url=${DARMA_URL}" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "tecdoc.api.url=https://webservice.tecalliance.services/pegasus-3-0/services/TecdocToCatDLB.soapEndpoint" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "tecdoc.api.key=${TECDOC_API_KEY}" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-            echo "filter.apikey=${FILTER_API_KEY}" >> ~/autodl/auto-dl-backend/src/main/resources/application.properties
-          fi
-
-          # Build and start the application
-          cd ~/autodl/auto-dl-backend
-          echo "Building and starting the application..."
-          echo "Current directory: \$(pwd)"
-          ls -la
-
-          # Check if docker-compose.yml exists
-          if [ ! -f docker-compose.yml ]; then
-            echo "Error: docker-compose.yml not found!"
-            exit 1
-          fi
-
-          # Create the external network if it doesn't exist
-          sudo docker network inspect autodl-network >/dev/null 2>&1 || sudo docker network create autodl-network
-
-          # Stop and remove any existing containers
-          sudo docker-compose -f docker-compose.yml down || true
-
-          # Build and start the application with build arguments to optimize the build
-          sudo docker-compose -f docker-compose.yml build --no-cache --pull
-          sudo docker-compose -f docker-compose.yml up -d
-
-          # Clean up build cache after successful deployment
-          sudo docker builder prune -f
-
-          # Check disk space after deployment
-          echo "\nDisk space after deployment:"
-          df -h
-
-          echo "Deployment completed successfully!"
+            cd /home/\$USER/autodl
+            
+            # Free up disk space 
+            echo "Cleaning up Docker resources..."
+            docker system prune -af --volumes
+            
+            # Load Docker image
+            echo "Loading Docker image..."
+            docker load < auto-dl-backend.tar.gz
+            
+            # Create application.properties from GitHub secret
+            echo "${APPLICATION_PROPERTIES}" > /home/\$USER/autodl/config/application.properties
+            
+            # Create the external network if it doesn't exist
+            docker network inspect autodl-network >/dev/null 2>&1 || docker network create autodl-network
+            
+            # Update docker-compose.yml with versioned image
+            VERSION="${VERSION}"
+            sed -i 's|build:|image: auto-dl-backend:'"${VERSION}"'|g' docker-compose.yml
+            sed -i '/dockerfile:/d' docker-compose.yml
+            sed -i '/context:/d' docker-compose.yml
+            
+            # Add volume mount for application.properties
+            sed -i '/ports:/i \ \ \ \ volumes:\n\ \ \ \ \ \ - ~/autodl/config:/app/config' docker-compose.yml
+            
+            # Display the modified docker-compose.yml for debugging
+            echo "Modified docker-compose.yml:"
+            cat docker-compose.yml
+            
+            # Stop and remove any existing containers
+            docker compose -f docker-compose.yml down || true
+            
+            # Start the application
+            docker compose -f docker-compose.yml up -d
           EOF
-
-      - name: Notify Deployment Result
-        if: always() # Ensures this step runs even if previous steps fail
-        env: # Add env block to easily access commit message
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+      
+      - name: Wait for app to start
+        run: sleep 30
+        
+      - name: Check if application container is running
+        continue-on-error: true
         run: |
-          # Construct the pipeline URL correctly using GitHub context variables
-          RAW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          # Create a properly formatted URL
-          PIPELINE_URL="$RAW_URL"
+          ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "docker ps"
+          ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "docker ps | grep auto-dl-backend || echo 'Container not found'"
+      
+      - name: Check logs if container is not running
+        continue-on-error: true
+        run: |
+          ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "docker compose -f /home/${{ secrets.AZURE_USER }}/autodl/docker-compose.yml logs --tail=50"
+          
+      - name: Verify application started successfully
+        continue-on-error: true
+        run: ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "curl -v http://localhost:50021/actuator/health || echo 'Health check failed'"
+        
+      - name: Set permissions on autodl directory
+        continue-on-error: true
+        run: ssh ${{ secrets.AZURE_USER }}@${{ secrets.AZURE_SERVER_IP }} "chmod -R 755 /home/${{ secrets.AZURE_USER }}/autodl"
+      
+      - name: Notify Deployment Result
+        if: always()
+        run: |
           if [ "${{ job.status }}" == "success" ]; then
-            # Added emoji icon back
             STATUS_ICON="✅"
-            STATUS_TEXT="finished successfully"
-            # Apply Google Chat formatting to suppress link preview
-            FORMATTED_PIPELINE_LINK="<${PIPELINE_URL}|Pipeline Link>"
-            # Added commit message with Java icon
-            MESSAGE="*PROD Deploy / ☕ AutoDL Backend*\n${{ github.actor }} ${STATUS_TEXT} deploying branch \`${{ github.ref_name }}\` to production.\nCommit: \`${COMMIT_MESSAGE}\`\n${FORMATTED_PIPELINE_LINK}"
+            RESULT_TEXT="successfully deployed"
           else
-            # Added emoji icon back
             STATUS_ICON="❌"
-            # Apply Google Chat formatting to suppress link preview
-            FORMATTED_PIPELINE_LINK="<${PIPELINE_URL}|Pipeline Link>"
-            STATUS_TEXT="FAILED"
-            # Added commit message with Java icon
-            MESSAGE="*PROD Deploy / ☕ AutoDL Backend*\nDeployment ${STATUS_TEXT} for branch \`${{ github.ref_name }}\` initiated by ${{ github.actor }}.\nCommit: \`${COMMIT_MESSAGE}\`\n${FORMATTED_PIPELINE_LINK}"
+            RESULT_TEXT="FAILED to deploy"
           fi
-          # Escape special characters for JSON (added status icon prefix back)
-          ESCAPED_MESSAGE=$(echo "$STATUS_ICON $MESSAGE" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+          
+          RESULT_MESSAGE="$STATUS_ICON *PROD Deploy / ☕ AutoDL Backend*\n${{ github.actor }} $RESULT_TEXT branch \`${{ github.ref_name }}\` to production.\nCommit: \`${{ github.event.head_commit.message }}\`\n[${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}](Pipeline Link)"
+          ESCAPED_RESULT_MESSAGE=$(echo "$RESULT_MESSAGE" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+          
           curl -s -X POST -H 'Content-Type: application/json' \
-               -d "{\"text\": \"$ESCAPED_MESSAGE\"}" \
-               '${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}'
+               -d "{\"text\": \"$ESCAPED_RESULT_MESSAGE\"}" \
+               '${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}' || echo "Warning: Failed to send result notification."

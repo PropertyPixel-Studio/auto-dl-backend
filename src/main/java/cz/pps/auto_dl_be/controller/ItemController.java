@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +30,7 @@ import java.util.List;
 @RequestMapping("/items")
 @RequiredArgsConstructor
 @EnableScheduling
+@SecurityRequirement(name = "apiKey")
 public class ItemController {
     private static final Logger logger = LoggerFactory.getLogger(ItemController.class);
     private final MedusaService medusaService;
