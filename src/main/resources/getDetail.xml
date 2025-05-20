@@ -6,7 +6,7 @@
         <tec:getArticles>
             <tec:articleCountry>CZ</tec:articleCountry>
             <tec:lang>CS</tec:lang>
-            <tec:provider>24019</tec:provider>
+            <tec:provider>${providerId}</tec:provider>
             <tec:includeAll>true</tec:includeAll>
             <tec:perPage>100</tec:perPage>
             <tec:page>1</tec:page>

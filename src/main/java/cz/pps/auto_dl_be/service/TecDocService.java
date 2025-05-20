@@ -94,7 +94,8 @@ public class TecDocService {
             throw new RuntimeException(e);
         }
         template = template.replace("${searchQuery}", searchQuery)
-                .replace("${dataSupplierIds}", dataSupplierIds);
+                .replace("${dataSupplierIds}", dataSupplierIds)
+                .replace("${providerId}", tecDocProviderId);
         return template;
     }
 

@@ -5,10 +5,10 @@
     <soapenv:Body>
         <tec:getBrands>
             <tec:articleCountry>CZ</tec:articleCountry>
-
             <tec:lang>CS</tec:lang>
-
             <tec:provider>${providerId}</tec:provider>
+            <tec:perPage>200</tec:perPage>
+            <tec:page>1</tec:page>
         </tec:getBrands>
     </soapenv:Body>
 </soapenv:Envelope>
