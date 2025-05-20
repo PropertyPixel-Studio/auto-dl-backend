@@ -56,6 +56,10 @@ public class MedusaService {
     private Counter errorCounter;
     private Timer downloadTimer;
     private Timer conversionTimer;
+    private Counter darmaScrapingStartedCounter;
+    private Counter darmaScrapingCompletedCounter;
+    private Counter darmaScrapingFailedCounter;
+    private Timer darmaScrapingTimer;
 
     @PostConstruct
     private void initMetrics() {
@@ -86,9 +90,29 @@ public class MedusaService {
         conversionTimer = Timer.builder("medusa.csv.conversion.time")
                 .description("Time taken to convert CSV file")
                 .register(meterRegistry);
+                
+        darmaScrapingStartedCounter = Counter.builder("darma.scraping.started.count")
+                .description("Count of Darma scraping operations started")
+                .register(meterRegistry);
+                
+        darmaScrapingCompletedCounter = Counter.builder("darma.scraping.completed.count")
+                .description("Count of Darma scraping operations successfully completed")
+                .register(meterRegistry);
+                
+        darmaScrapingFailedCounter = Counter.builder("darma.scraping.failed.count")
+                .description("Count of Darma scraping operations that failed")
+                .register(meterRegistry);
+                
+        darmaScrapingTimer = Timer.builder("darma.scraping.time")
+                .description("Time taken to complete Darma scraping operations")
+                .register(meterRegistry);
+                
         meterRegistry.gauge("medusa.product.count",
                 productService,
                 ProductService::getProductCount);
+                
+        // Add a gauge for Darma scraping status (0=idle, 1=in-progress)
+        meterRegistry.gauge("darma.scraping.status", 0);
     }
 
     private static Item getItem(List<String> values) {
@@ -111,25 +135,64 @@ public class MedusaService {
 
     @Async
     public void downloadAndSaveCsvAsItems() throws CsvDownloadException, NoDataException, SavingCsvException, CsvConversionException {
-        logger.info("Downloading CSV data from Darma");
-        File csvFile = getCsvFile(apiUrl);
-        List<Brand> brands = fetchBrands();
-        logger.info("Fetched brands from TecDoc API");
-        convertToItemsAndSave(csvFile, brands);
-        deleteCsvFile(csvFile);
+        Timer.Sample scrapeSample = Timer.start(meterRegistry);
+        darmaScrapingStartedCounter.increment();
+        meterRegistry.gauge("darma.scraping.status", 1); // Set status to in-progress
+        
+        logger.info("Starting Darma data scraping process");
+        try {
+            logger.info("Downloading CSV data from Darma");
+            File csvFile = getCsvFile(apiUrl);
+            List<Brand> brands = fetchBrands();
+            logger.info("Fetched brands from TecDoc API");
+            convertToItemsAndSave(csvFile, brands);
+            deleteCsvFile(csvFile);
+            
+            darmaScrapingCompletedCounter.increment();
+            logger.info("Darma data scraping process completed successfully");
+        } catch (Exception e) {
+            darmaScrapingFailedCounter.increment();
+            logger.error("Darma data scraping process failed: {}", e.getMessage(), e);
+            throw e;
+        } finally {
+            scrapeSample.stop(darmaScrapingTimer);
+            meterRegistry.gauge("darma.scraping.status", 0); // Reset status to idle
+        }
     }
 
     @Async
     @Transactional
     public void updateDataInDatabase() {
-        Stream<ProductEntity> dataStream = productService.getAllProductsAsStream();
-        dataStream.forEach(product -> {
-            List<Article> articles = tecDocService.fetchArticles(product.getTecDocId(), product.getSupplierId()).block();
-            if (articles != null && !articles.isEmpty()) {
-                updateArticlesToDatabase(articles.getFirst(), product);
-                logger.info("Updated product: {}", product.getTecDocId());
-            }
-        });
+        Timer.Sample scrapeSample = Timer.start(meterRegistry);
+        darmaScrapingStartedCounter.increment();
+        meterRegistry.gauge("darma.scraping.status", 1); // Set status to in-progress
+        
+        logger.info("Starting product database update process");
+        try {
+            Stream<ProductEntity> dataStream = productService.getAllProductsAsStream();
+            dataStream.forEach(product -> {
+                try {
+                    List<Article> articles = tecDocService.fetchArticles(product.getTecDocId(), product.getSupplierId()).block();
+                    if (articles != null && !articles.isEmpty()) {
+                        updateArticlesToDatabase(articles.getFirst(), product);
+                        logger.info("Updated product: {}", product.getTecDocId());
+                    }
+                } catch (Exception e) {
+                    errorCounter.increment();
+                    logger.error("Error updating product {}: {}", product.getTecDocId(), e.getMessage(), e);
+                }
+            });
+            
+            darmaScrapingCompletedCounter.increment();
+            logger.info("Product database update process completed successfully");
+        } catch (Exception e) {
+            darmaScrapingFailedCounter.increment();
+            logger.error("Product database update process failed: {}", e.getMessage(), e);
+            throw e;
+        } finally {
+            scrapeSample.stop(darmaScrapingTimer);
+            meterRegistry.gauge("darma.scraping.status", 0); // Reset status to idle
+        }
     }
 
     private File getCsvFile(String apiUrl) throws CsvDownloadException, NoDataException, SavingCsvException {
