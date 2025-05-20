@@ -1,5 +1,7 @@
 package cz.pps.auto_dl_be.service;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.search.Search;
 import lombok.RequiredArgsConstructor;
@@ -75,7 +77,7 @@ public class MetricsReportService {
      */
     private int getGaugeValue(String metricName) {
         return Search.in(meterRegistry).name(metricName).gauge()
-               .map(gauge -> gauge.value())
+               .map(g -> g.value())
                .map(Double::intValue)
                .orElse(0);
     }
