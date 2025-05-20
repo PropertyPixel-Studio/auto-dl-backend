@@ -65,14 +65,19 @@ public class MetricsReportService {
      * Gets the value of a counter metric, or 0 if not found.
      */
     private double getCounterValue(String metricName) {
-        return Search.in(meterRegistry).name(metricName).counter().map(counter -> counter.count()).orElse(0.0);
+        return Search.in(meterRegistry).name(metricName).counter()
+               .map(Counter::count)
+               .orElse(0.0);
     }
     
     /**
      * Gets the value of a gauge metric, or 0 if not found.
      */
     private int getGaugeValue(String metricName) {
-        return Search.in(meterRegistry).name(metricName).gauge().map(gauge -> gauge.value()).map(Double::intValue).orElse(0);
+        return Search.in(meterRegistry).name(metricName).gauge()
+               .map(gauge -> gauge.value())
+               .map(Double::intValue)
+               .orElse(0);
     }
     
     private String formatMetricValue(double value) {
