@@ -11,8 +11,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collection;
 
 @Service
 @RequiredArgsConstructor
@@ -67,19 +67,23 @@ public class MetricsReportService {
      * Gets the value of a counter metric, or 0 if not found.
      */
     private double getCounterValue(String metricName) {
-        return Search.in(meterRegistry).name(metricName).counter()
-               .map(Counter::count)
-               .orElse(0.0);
+        Collection<Counter> counters = Search.in(meterRegistry).name(metricName).counters();
+        if (counters.isEmpty()) {
+            return 0.0;
+        }
+        return counters.iterator().next().count();
     }
     
     /**
      * Gets the value of a gauge metric, or 0 if not found.
      */
     private int getGaugeValue(String metricName) {
-        return Search.in(meterRegistry).name(metricName).gauge()
-               .map(g -> g.value())
-               .map(Double::intValue)
-               .orElse(0);
+        Collection<Gauge> gauges = Search.in(meterRegistry).name(metricName).gauges();
+        if (gauges.isEmpty()) {
+            return 0;
+        }
+        double value = gauges.iterator().next().value();
+        return (int) value;
     }
     
     private String formatMetricValue(double value) {
