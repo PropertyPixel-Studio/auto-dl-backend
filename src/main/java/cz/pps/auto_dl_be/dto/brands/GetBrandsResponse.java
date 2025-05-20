@@ -11,6 +11,9 @@ import lombok.Setter;
 public class GetBrandsResponse {
     @JacksonXmlProperty(localName = "status")
     private int status;
+    
+    @JacksonXmlProperty(localName = "statusText")
+    private String statusText;
 
     @JacksonXmlProperty(localName = "data")
     private BrandData data;
